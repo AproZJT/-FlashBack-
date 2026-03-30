@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<!-- HTML5 文档类型声明 -->
+<html lang="zh-CN">
+  <head>
+    <!-- 字符编码设置为 UTF-8 -->
+    <meta charset="UTF-8" />
+    <script>
+      // 检测浏览器是否支持 CSS 环境变量（用于适配刘海屏等特殊屏幕）
+      var coverSupport = 'CSS' in window && typeof CSS.supports === 'function' && (CSS.supports('top: env(a)') ||
+        CSS.supports('top: constant(a)'))
+      // 动态生成 viewport 元标签，设置移动端视口配置
+      document.write(
+        '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0' +
+        (coverSupport ? ', viewport-fit=cover' : '') + '" />')
+    </script>
+    <!-- 页面标题（为空，由应用动态设置） -->
+    <title></title>
+    <!-- 预加载链接占位符 -->
+    <!--preload-links-->
+    <!-- 应用上下文占位符 -->
+    <!--app-context-->
+  </head>
+  <body>
+    <!-- Vue 应用挂载点，应用将在此处渲染 -->
+    <div id="app"><!--app-html--></div>
+    <!-- 引入主应用脚本，type="module" 表示使用 ES6 模块 -->
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "#0B1020"
+      }
+    },
+    {
+      "path": "pages/deck/detail",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "#0B1020"
+      }
+    },
+    {
+      "path": "pages/review/flashcard",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "#0B1020"
+      }
+    },
+    {
+      "path": "pages/user/profile",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "#0B1020"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#0B1020"
+  }
+}

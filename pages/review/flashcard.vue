@@ -7,28 +7,39 @@
     </view>
 
     <view class="stats" v-if="cards.length">
-      <text class="stats-item">掌握 {{ stats.master }}</text>
-      <text class="stats-sep">·</text>
-      <text class="stats-item">模糊 {{ stats.blur }}</text>
+      <text class="stats-item">Again {{ stats.again }}</text>
+      <text class="stats-item">Hard {{ stats.hard }}</text>
+      <text class="stats-item">Good {{ stats.good }}</text>
+      <text class="stats-item">Easy {{ stats.easy }}</text>
     </view>
 
     <view class="stage" v-if="currentCard">
-      <view class="card-shell" :class="[isFlipped ? 'is-flipped' : '', flyClass, cardMotionClass]" @tap="flipCard">
+      <view
+        class="card-shell"
+        :class="[isFlipped ? 'is-flipped' : '', flyClass, cardMotionClass]"
+        :style="{ transform: `translateX(${dragOffset}px)` }"
+        @tap="flipCard"
+        @touchstart.stop="onCardTouchStart"
+        @touchmove.stop="onCardTouchMove"
+        @touchend.stop="onCardTouchEnd"
+      >
         <view class="face front">
           <text class="face-label">问题</text>
-          <text class="face-text">{{ currentCard.front }}</text>
-          <text class="hint">点击翻转查看解析</text>
+          <text class="face-text">{{ currentCard.front_text || currentCard.front || '' }}</text>
+          <text class="hint">点击翻转查看解析 / 左右滑动提交反馈</text>
         </view>
         <view class="face back">
           <text class="face-label">解析</text>
-          <text class="face-text">{{ currentCard.back }}</text>
+          <text class="face-text">{{ currentCard.back_text || currentCard.back || '' }}</text>
         </view>
       </view>
     </view>
 
     <view class="actions" :class="{ show: isFlipped }">
-      <button class="btn blur" @tap.stop="answer('blur')">模糊</button>
-      <button class="btn master" @tap.stop="answer('master')">掌握</button>
+      <button class="btn again" @tap.stop="answer('again')">Again</button>
+      <button class="btn hard" @tap.stop="answer('hard')">Hard</button>
+      <button class="btn good" @tap.stop="answer('good')">Good</button>
+      <button class="btn easy" @tap.stop="answer('easy')">Easy</button>
     </view>
 
     <view v-if="!cards.length" class="empty">
@@ -55,11 +66,14 @@
 <script>
 import {
   getDeckById,
-  markCardResult,
+  reviewCard,
   saveReviewProgress,
   getReviewProgress,
   clearReviewProgress
 } from '@/utils/storage.js';
+
+const SWIPE_SUBMIT_THRESHOLD = 72;
+const SWIPE_STRONG_THRESHOLD = 130;
 
 export default {
   data() {
@@ -71,15 +85,24 @@ export default {
       flyClass: '',
       cardMotionClass: 'card-enter',
       finished: false,
+      dragOffset: 0,
+      submitting: false,
       stats: {
-        master: 0,
-        blur: 0
+        again: 0,
+        hard: 0,
+        good: 0,
+        easy: 0
       },
       edgeSwipe: {
         tracking: false,
         startX: 0,
         startY: 0,
         shouldHandle: false
+      },
+      cardSwipe: {
+        tracking: false,
+        startX: 0,
+        startY: 0
       }
     };
   },
@@ -88,14 +111,13 @@ export default {
       return this.cards[this.currentIndex];
     }
   },
-  onLoad(query) {
+  async onLoad(query) {
     this.deckId = query.deckId || '';
-    const deck = getDeckById(this.deckId);
-    this.cards = deck?.cards || [];
+    await this.loadDeck();
     const saved = getReviewProgress(this.deckId);
     if (saved && this.cards.length) {
       this.currentIndex = Math.min(saved.index || 0, this.cards.length - 1);
-      this.stats = saved.stats || { master: 0, blur: 0 };
+      this.stats = saved.stats || { again: 0, hard: 0, good: 0, easy: 0 };
     }
     if (this.cards.length) this.playEnterMotion();
   },
@@ -106,6 +128,10 @@ export default {
     this.persistProgress();
   },
   methods: {
+    async loadDeck() {
+      const deck = await getDeckById(this.deckId);
+      this.cards = deck?.cards || [];
+    },
     onEdgeSwipeStart(event) {
       const touch = event.touches && event.touches[0];
       if (!touch) return;
@@ -130,6 +156,39 @@ export default {
       this.edgeSwipe.tracking = false;
       this.edgeSwipe.shouldHandle = false;
     },
+    onCardTouchStart(event) {
+      const touch = event.touches && event.touches[0];
+      if (!touch || this.submitting || !this.currentCard) return;
+      this.cardSwipe.tracking = true;
+      this.cardSwipe.startX = touch.clientX;
+      this.cardSwipe.startY = touch.clientY;
+      this.dragOffset = 0;
+    },
+    onCardTouchMove(event) {
+      if (!this.cardSwipe.tracking || this.submitting) return;
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      const deltaX = touch.clientX - this.cardSwipe.startX;
+      const deltaY = Math.abs(touch.clientY - this.cardSwipe.startY);
+      if (deltaY > 48) return;
+      this.dragOffset = Math.max(-180, Math.min(180, deltaX));
+    },
+    async onCardTouchEnd() {
+      if (!this.cardSwipe.tracking || this.submitting) return;
+      this.cardSwipe.tracking = false;
+      const x = this.dragOffset;
+      this.dragOffset = 0;
+      if (Math.abs(x) < SWIPE_SUBMIT_THRESHOLD) return;
+      if (!this.isFlipped) {
+        uni.showToast({ title: '请先翻转查看解析', icon: 'none' });
+        return;
+      }
+      if (x < 0) {
+        await this.answer(Math.abs(x) >= SWIPE_STRONG_THRESHOLD ? 'again' : 'hard');
+      } else {
+        await this.answer(Math.abs(x) >= SWIPE_STRONG_THRESHOLD ? 'easy' : 'good');
+      }
+    },
     goBack() {
       uni.navigateBack();
     },
@@ -146,21 +205,32 @@ export default {
       if (!this.currentCard || this.flyClass || this.cardMotionClass === 'card-enter') return;
       this.isFlipped = !this.isFlipped;
     },
-    answer(type) {
-      if (!this.currentCard || !this.isFlipped || this.flyClass) return;
-      this.flyClass = type === 'master' ? 'fly-right' : 'fly-left';
-      if (type === 'master') this.stats.master += 1;
-      else this.stats.blur += 1;
-      markCardResult(this.deckId, this.currentCard.id, type);
-      setTimeout(() => {
-        this.nextCard();
-      }, 360);
+    async answer(type) {
+      if (!this.currentCard || !this.isFlipped || this.flyClass || this.submitting) return;
+      this.submitting = true;
+      this.flyClass = type === 'again' || type === 'hard' ? 'fly-left' : 'fly-right';
+      this.stats[type] = (this.stats[type] || 0) + 1;
+
+      const version = Number(this.currentCard.version || 0);
+      const result = await reviewCard(this.deckId, this.currentCard.id, type, version);
+      if (!result.ok) {
+        this.submitting = false;
+        this.flyClass = '';
+        uni.showToast({ title: result.message || '提交失败', icon: 'none' });
+        await this.loadDeck();
+        return;
+      }
+
+      setTimeout(async () => {
+        await this.nextCard();
+        this.submitting = false;
+      }, 260);
     },
     playEnterMotion() {
       this.cardMotionClass = 'card-enter';
       setTimeout(() => {
         this.cardMotionClass = '';
-      }, 360);
+      }, 320);
     },
     persistProgress() {
       if (!this.deckId || !this.cards.length) return;
@@ -173,14 +243,19 @@ export default {
         stats: this.stats
       });
     },
-    nextCard() {
+    async nextCard() {
       this.flyClass = '';
       this.isFlipped = false;
+      this.dragOffset = 0;
+
+      await this.loadDeck();
+
       if (this.currentIndex >= this.cards.length - 1) {
         this.finished = true;
         clearReviewProgress(this.deckId);
         return;
       }
+
       this.currentIndex += 1;
       this.persistProgress();
       this.playEnterMotion();
@@ -190,54 +265,90 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: #0b1020; display: flex; flex-direction: column; padding-bottom: 118rpx; }
+.page {
+  min-height: 100vh;
+  background: $fb-bg-page;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 118rpx;
+}
 .top-nav {
   margin: 24rpx 24rpx 0;
-  height: 86rpx; border-radius: 20rpx; background: #121a2f; border: 1rpx solid #1f2a44;
-  display: flex; align-items: center; justify-content: space-between; padding: 0 20rpx;
+  height: 86rpx;
+  border-radius: 20rpx;
+  background: $fb-bg-surface;
+  border: 1rpx solid $fb-border;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20rpx;
 }
-.nav-left,.nav-right { color: #7ee0b5; font-size: 24rpx; }
-.nav-title { color: #e5edff; font-size: 28rpx; font-weight: 600; }
-.stats { display: flex; justify-content: center; margin-top: 16rpx; color: #8ca0c7; font-size: 24rpx; }
-.stats-sep { margin: 0 8rpx; }
+.nav-left,.nav-right { color: $fb-text-secondary; font-size: 24rpx; }
+.nav-title { color: $fb-text-primary; font-size: 28rpx; font-weight: 700; }
+.stats { display: flex; justify-content: center; gap: 14rpx; margin-top: 14rpx; color: $fb-text-secondary; font-size: 22rpx; }
 .stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10rpx 30rpx 0; perspective: 1200rpx; }
-.card-shell { width: 100%; height: 64vh; position: relative; transform-style: preserve-3d; transition: transform .56s cubic-bezier(.2,.75,.2,1.04); }
+.card-shell {
+  width: 100%;
+  height: 64vh;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform .42s cubic-bezier(.2,.75,.2,1.04);
+}
 .card-shell.is-flipped { transform: rotateY(180deg); }
-.card-enter { animation: cardEnter .34s cubic-bezier(.22,.8,.25,1) both; }
+.card-enter { animation: cardEnter .30s cubic-bezier(.22,.8,.25,1) both; }
 .face {
-  position: absolute; inset: 0; background: #121a2f; border: 1rpx solid #1f2a44; border-radius: 30rpx;
-  box-shadow: 0 24rpx 40rpx rgba(0, 0, 0, 0.35);
-  backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  padding: 44rpx 34rpx; display: flex; flex-direction: column; box-sizing: border-box;
+  position: absolute;
+  inset: 0;
+  background: $fb-bg-surface;
+  border: 1rpx solid $fb-border;
+  border-radius: 30rpx;
+  box-shadow: 0 16rpx 30rpx rgba(48, 102, 161, 0.12);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  padding: 44rpx 34rpx;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 .back { transform: rotateY(180deg); }
-.face-label { color: #8ca0c7; font-size: 24rpx; }
-.face-text { margin-top: 24rpx; color: #e7eeff; font-size: 36rpx; font-weight: 650; line-height: 1.62; }
-.hint { margin-top: auto; color: #7084ad; font-size: 24rpx; }
-.actions { display: flex; gap: 20rpx; padding: 0 30rpx 28rpx; opacity: 0; transform: translateY(30rpx); pointer-events: none; }
-.actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; animation: springIn .36s cubic-bezier(.18,.9,.26,1.2); }
-.btn { flex: 1; height: 88rpx; line-height: 88rpx; border-radius: 44rpx; color: #fff; font-size: 30rpx; font-weight: 600; }
-.blur { background: #475569; }
-.master { background: linear-gradient(180deg, #2bb070 0%, #1f7a53 100%); }
-.fly-left { animation: flyLeft .36s forwards cubic-bezier(.16,.84,.44,1); }
-.fly-right { animation: flyRight .36s forwards cubic-bezier(.16,.84,.44,1); }
-@keyframes flyLeft { 20% { transform: translateX(-12%) rotate(-2deg); } to { transform: translateX(-130%) rotate(-11deg); opacity: 0; } }
-@keyframes flyRight { 20% { transform: translateX(12%) rotate(2deg); } to { transform: translateX(130%) rotate(11deg); opacity: 0; } }
-@keyframes cardEnter { from { opacity: 0; transform: translateY(24rpx) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes springIn { 0% { transform: translateY(26rpx) scale(.95); } 60% { transform: translateY(-4rpx) scale(1.02); } 100% { transform: translateY(0) scale(1); } }
-.empty { padding: 220rpx 30rpx 0; text-align: center; }
-.empty-title { color: #d3dcf3; font-size: 30rpx; }
-.empty-btn { margin-top: 20rpx; background: #1f7a53; color: #fff; border-radius: 40rpx; }
-.finish-mask { position: fixed; inset: 0; background: rgba(7,10,18,.56); display: flex; align-items: center; justify-content: center; }
-.finish-card { width: 78%; background: #121a2f; border: 1rpx solid #1f2a44; border-radius: 22rpx; padding: 40rpx 28rpx; text-align: center; }
-.finish-title { color: #e7eeff; font-size: 34rpx; font-weight: 700; }
-.finish-tip { display: block; margin-top: 12rpx; color: #8ca0c7; font-size: 24rpx; }
-.finish-btn { margin-top: 24rpx; background: #1f7a53; color: #fff; border-radius: 40rpx; }
-.bottom-nav {
-  position: fixed; left: 24rpx; right: 24rpx; bottom: 26rpx;
-  background: #121a2f; border: 1rpx solid #1f2a44; border-radius: 20rpx;
-  height: 88rpx; display: flex; align-items: center;
+.face-label { color: $fb-text-secondary; font-size: 24rpx; }
+.face-text { margin-top: 24rpx; color: $fb-text-primary; font-size: 34rpx; font-weight: 650; line-height: 1.62; }
+.hint { margin-top: auto; color: $fb-text-secondary; font-size: 24rpx; }
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12rpx;
+  padding: 0 30rpx 28rpx;
+  opacity: 0;
+  transform: translateY(30rpx);
+  pointer-events: none;
 }
-.nav-item { flex: 1; text-align: center; color: #8ca0c7; font-size: 26rpx; }
-.nav-item.active { color: #7ee0b5; font-weight: 600; }
+.actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; animation: springIn .30s cubic-bezier(.18,.9,.26,1.2); }
+.btn { height: 84rpx; line-height: 84rpx; border-radius: 42rpx; color: #fff; font-size: 28rpx; font-weight: 700; }
+.again { background: $fb-review-again; }
+.hard { background: $fb-review-hard; }
+.good { background: $fb-review-good; }
+.easy { background: $fb-review-easy; }
+.fly-left { animation: flyLeft .28s forwards cubic-bezier(.16,.84,.44,1); }
+.fly-right { animation: flyRight .28s forwards cubic-bezier(.16,.84,.44,1); }
+@keyframes flyLeft { 20% { transform: translateX(-12%) rotate(-2deg); } to { transform: translateX(-120%) rotate(-10deg); opacity: 0; } }
+@keyframes flyRight { 20% { transform: translateX(12%) rotate(2deg); } to { transform: translateX(120%) rotate(10deg); opacity: 0; } }
+@keyframes cardEnter { from { opacity: 0; transform: translateY(24rpx) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes springIn { 0% { transform: translateY(20rpx) scale(.95); } 100% { transform: translateY(0) scale(1); } }
+.empty { padding: 220rpx 30rpx 0; text-align: center; }
+.empty-title { color: $fb-text-primary; font-size: 30rpx; }
+.empty-btn { margin-top: 20rpx; background: $fb-review-easy; color: #fff; border-radius: 40rpx; }
+.finish-mask { position: fixed; inset: 0; background: rgba(21, 39, 64, .36); display: flex; align-items: center; justify-content: center; }
+.finish-card { width: 78%; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: 22rpx; padding: 40rpx 28rpx; text-align: center; }
+.finish-title { color: $fb-text-primary; font-size: 34rpx; font-weight: 700; }
+.finish-tip { display: block; margin-top: 12rpx; color: $fb-text-secondary; font-size: 24rpx; }
+.finish-btn { margin-top: 24rpx; background: $fb-review-easy; color: #fff; border-radius: 40rpx; }
+.bottom-nav {
+  position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx;
+  background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: 26rpx;
+  box-shadow: 0 10rpx 24rpx rgba(88, 139, 193, 0.15);
+  height: 94rpx; display: flex; align-items: center;
+}
+.nav-item { flex: 1; text-align: center; color: $fb-text-secondary; font-size: 26rpx; }
+.nav-item.active { color: #5f41f6; font-weight: 700; }
 </style>

@@ -14,6 +14,18 @@
 
 @import '@/uni_modules/uview-plus/theme.scss';
 
+/* FlashBack Semantic Tokens */
+$fb-bg-page: #f8fbff;
+$fb-bg-surface: #ffffff;
+$fb-border: #d8ebff;
+$fb-text-primary: #244f88;
+$fb-text-secondary: #6f88ae;
+
+$fb-review-again: #ef4444;   // red
+$fb-review-hard: #f59e0b;    // orange
+$fb-review-good: #64748b;    // gray-blue
+$fb-review-easy: #16a34a;    // green
+
 /* 颜色变量 */
 
 /* 行为相关颜色 */

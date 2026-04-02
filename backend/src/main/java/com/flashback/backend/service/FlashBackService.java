@@ -21,15 +21,18 @@ public class FlashBackService {
     private final ObjectMapper objectMapper;
     private final FeatureFlagsProperties flags;
     private final LearningMetricsService metricsService;
+    private final ReviewSchedulerService reviewSchedulerService;
 
     public FlashBackService(StringRedisTemplate redis,
                             ObjectMapper objectMapper,
                             FeatureFlagsProperties flags,
-                            LearningMetricsService metricsService) {
+                            LearningMetricsService metricsService,
+                            ReviewSchedulerService reviewSchedulerService) {
         this.redis = redis;
         this.objectMapper = objectMapper;
         this.flags = flags;
         this.metricsService = metricsService;
+        this.reviewSchedulerService = reviewSchedulerService;
     }
 
     private String userKey(String userId) { return "fb:user:" + userId; }
@@ -173,6 +176,7 @@ public class FlashBackService {
         card.put("back_text", String.valueOf(payload.getOrDefault("back", "")));
         card.put("review_count", 0);
         card.put("mastery_level", 0);
+        card.put("last_review_grade", -1);
         card.put("last_review_time", 0);
         card.put("next_review_time", 0);
         card.put("version", 0);
@@ -225,17 +229,24 @@ public class FlashBackService {
         }
 
         long now = System.currentTimeMillis();
+        String normalizedFeedback = normalizeFeedback(feedback);
         int level = ((Number) card.getOrDefault("mastery_level", 0)).intValue();
-        if ("forget".equals(feedback)) level = 1;
-        if ("blur".equals(feedback)) level = 2;
-        if ("master".equals(feedback)) level = 3;
+        int grade = switch (normalizedFeedback) {
+            case "again" -> 0;
+            case "hard" -> 1;
+            case "good" -> 2;
+            case "easy" -> 3;
+            default -> 2;
+        };
+        level = Math.max(1, grade);
 
         long dueBefore = Optional.ofNullable(redis.opsForZSet().size(reviewZsetKey(userId))).orElse(0L);
 
         long nextReview = flags.enableV2Schedule()
-                ? calcNextReviewTimeV2(card, feedback, now)
-                : calcNextReviewTime(level, feedback, now);
+                ? reviewSchedulerService.nextReviewTimeV2(card, normalizedFeedback, now)
+                : reviewSchedulerService.nextReviewTimeV1(level, normalizedFeedback, now);
         card.put("mastery_level", level);
+        card.put("last_review_grade", grade);
         card.put("review_count", ((Number) card.getOrDefault("review_count", 0)).intValue() + 1);
         card.put("last_review_time", now);
         card.put("next_review_time", nextReview);
@@ -246,7 +257,7 @@ public class FlashBackService {
         markStudyToday(userId);
 
         long dueAfter = Optional.ofNullable(redis.opsForZSet().size(reviewZsetKey(userId))).orElse(0L);
-        metricsService.onReview(userId, feedback, dueBefore, dueAfter);
+        metricsService.onReview(userId, normalizedFeedback, dueBefore, dueAfter);
         return card;
     }
 
@@ -345,41 +356,11 @@ public class FlashBackService {
         return list;
     }
 
-    private long calcNextReviewTime(int mastery, String feedback, long now) {
-        if ("forget".equals(feedback)) return now + 12 * HOUR;
-        if ("blur".equals(feedback)) return now + DAY;
-        return switch (mastery) {
-            case 1 -> now + 2 * DAY;
-            case 2 -> now + 4 * DAY;
-            case 3 -> now + 7 * DAY;
-            default -> now + DAY;
-        };
-    }
-
-    // Sprint 0 兼容层：V2 调度开关关闭时仍走原有逻辑，开启时使用扩展字段
-    private long calcNextReviewTimeV2(Map<String, Object> card, String feedback, long now) {
-        double difficulty = ((Number) card.getOrDefault("difficulty", 0.3)).doubleValue();
-        double stability = ((Number) card.getOrDefault("stability", 0.0)).doubleValue();
-
-        if ("forget".equals(feedback)) {
-            difficulty = Math.min(1.0, difficulty + 0.08);
-            stability = Math.max(0.0, stability * 0.5);
-        } else if ("blur".equals(feedback)) {
-            difficulty = Math.min(1.0, difficulty + 0.03);
-            stability = stability + 0.7;
-        } else {
-            difficulty = Math.max(0.0, difficulty - 0.04);
-            stability = stability + 1.5;
-        }
-
-        double retrievability = Math.max(0.0, Math.min(1.0, 1.0 - difficulty * 0.5));
-        card.put("difficulty", difficulty);
-        card.put("stability", stability);
-        card.put("retrievability", retrievability);
-
-        long base = "forget".equals(feedback) ? 12 * HOUR : DAY;
-        long bonus = (long) (stability * 0.5 * DAY);
-        return now + Math.max(base, base + bonus);
+    private String normalizeFeedback(String feedback) {
+        if ("forget".equals(feedback)) return "again";
+        if ("blur".equals(feedback)) return "hard";
+        if ("master".equals(feedback)) return "good";
+        return feedback;
     }
 
     private void markStudyToday(String userId) {

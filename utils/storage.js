@@ -9,6 +9,11 @@ const DEFAULT_USER_ID = (typeof process !== 'undefined' && process.env && proces
 const TOKEN_KEY = 'flashback_auth_token_v1';
 const USER_ID_KEY = 'flashback_user_id_v1';
 const REVIEW_PROGRESS_KEY = 'flashback_review_progress_v1';
+const OFFLINE_QUEUE_KEY = 'flashback_offline_queue_v1';
+const OFFLINE_CONFLICTS_KEY = 'flashback_offline_conflicts_v1';
+const CACHE_DECKS_KEY = 'flashback_cache_decks_v1';
+const CACHE_DUE_KEY = 'flashback_cache_due_v1';
+const CACHE_DECK_DETAIL_PREFIX = 'flashback_cache_deck_detail_v1_';
 
 let loadingCount = 0;
 
@@ -60,6 +65,47 @@ function normalizeFailure(res, rawMessage) {
     return { ok: false, code: statusCode, message: '服务异常，请稍后重试' };
   }
   return { ok: false, code: statusCode || -1, message: rawMessage || '请求失败' };
+}
+
+function setCache(key, value) {
+  try { uni.setStorageSync(key, value); } catch (e) {}
+}
+
+function getCache(key, fallback) {
+  try {
+    const value = uni.getStorageSync(key);
+    return value === '' || value === undefined ? fallback : value;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function getOfflineQueue() {
+  return getCache(OFFLINE_QUEUE_KEY, []);
+}
+
+function setOfflineQueue(queue) {
+  setCache(OFFLINE_QUEUE_KEY, queue || []);
+}
+
+function pushOfflineQueue(item) {
+  const queue = getOfflineQueue();
+  queue.push({ id: `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`, ...item });
+  setOfflineQueue(queue);
+}
+
+function pushOfflineConflict(item) {
+  const list = getCache(OFFLINE_CONFLICTS_KEY, []);
+  list.push({ at: Date.now(), ...item });
+  setCache(OFFLINE_CONFLICTS_KEY, list);
+}
+
+export function getOfflineConflicts() {
+  return getCache(OFFLINE_CONFLICTS_KEY, []);
+}
+
+export function clearOfflineConflicts() {
+  setCache(OFFLINE_CONFLICTS_KEY, []);
 }
 
 function request(url, method = 'GET', data, options = {}) {
@@ -202,9 +248,9 @@ export async function deleteCard(deckId, cardId) {
   return { ok: true };
 }
 
-export async function reviewCard(deckId, cardId, feedback) {
+export async function reviewCard(deckId, cardId, feedback, version = 0) {
   await ensureAuthed();
-  const res = await request(`/decks/${deckId}/cards/${cardId}/review`, 'POST', { feedback });
+  const res = await request(`/decks/${deckId}/cards/${cardId}/review`, 'POST', { feedback, version });
   if (!res.ok) return { ok: false, message: res.message };
   return { ok: true, card: res.data };
 }

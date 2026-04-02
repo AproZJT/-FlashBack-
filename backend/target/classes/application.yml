@@ -8,3 +8,8 @@ spring:
       port: 6379
       database: 0
       timeout: 3s
+
+flashback:
+  jwt:
+    secret: "FlashBack_ChangeThisSecretForProduction_AtLeast32Bytes"
+    expire-seconds: 604800

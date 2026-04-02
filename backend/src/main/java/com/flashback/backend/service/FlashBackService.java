@@ -2,7 +2,9 @@ package com.flashback.backend.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flashback.backend.config.FeatureFlagsProperties;
 import com.flashback.backend.exception.BizException;
+import com.flashback.backend.metrics.LearningMetricsService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -17,10 +19,17 @@ public class FlashBackService {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private final FeatureFlagsProperties flags;
+    private final LearningMetricsService metricsService;
 
-    public FlashBackService(StringRedisTemplate redis, ObjectMapper objectMapper) {
+    public FlashBackService(StringRedisTemplate redis,
+                            ObjectMapper objectMapper,
+                            FeatureFlagsProperties flags,
+                            LearningMetricsService metricsService) {
         this.redis = redis;
         this.objectMapper = objectMapper;
+        this.flags = flags;
+        this.metricsService = metricsService;
     }
 
     private String userKey(String userId) { return "fb:user:" + userId; }
@@ -167,6 +176,10 @@ public class FlashBackService {
         card.put("last_review_time", 0);
         card.put("next_review_time", 0);
         card.put("version", 0);
+        card.put("difficulty", payload.getOrDefault("difficulty", 0.3));
+        card.put("stability", payload.getOrDefault("stability", 0.0));
+        card.put("retrievability", payload.getOrDefault("retrievability", 0.0));
+        card.put("media", payload.getOrDefault("media", new HashMap<String, Object>()));
         card.put("created_at", now);
         redis.opsForValue().set(cardKey(cardId), toJson(card));
         redis.opsForSet().add(deckCardSetKey(deckId), cardId);
@@ -217,7 +230,11 @@ public class FlashBackService {
         if ("blur".equals(feedback)) level = 2;
         if ("master".equals(feedback)) level = 3;
 
-        long nextReview = calcNextReviewTime(level, feedback, now);
+        long dueBefore = Optional.ofNullable(redis.opsForZSet().size(reviewZsetKey(userId))).orElse(0L);
+
+        long nextReview = flags.enableV2Schedule()
+                ? calcNextReviewTimeV2(card, feedback, now)
+                : calcNextReviewTime(level, feedback, now);
         card.put("mastery_level", level);
         card.put("review_count", ((Number) card.getOrDefault("review_count", 0)).intValue() + 1);
         card.put("last_review_time", now);
@@ -227,6 +244,9 @@ public class FlashBackService {
 
         redis.opsForZSet().add(reviewZsetKey(userId), cardId, nextReview);
         markStudyToday(userId);
+
+        long dueAfter = Optional.ofNullable(redis.opsForZSet().size(reviewZsetKey(userId))).orElse(0L);
+        metricsService.onReview(userId, feedback, dueBefore, dueAfter);
         return card;
     }
 
@@ -334,6 +354,32 @@ public class FlashBackService {
             case 3 -> now + 7 * DAY;
             default -> now + DAY;
         };
+    }
+
+    // Sprint 0 兼容层：V2 调度开关关闭时仍走原有逻辑，开启时使用扩展字段
+    private long calcNextReviewTimeV2(Map<String, Object> card, String feedback, long now) {
+        double difficulty = ((Number) card.getOrDefault("difficulty", 0.3)).doubleValue();
+        double stability = ((Number) card.getOrDefault("stability", 0.0)).doubleValue();
+
+        if ("forget".equals(feedback)) {
+            difficulty = Math.min(1.0, difficulty + 0.08);
+            stability = Math.max(0.0, stability * 0.5);
+        } else if ("blur".equals(feedback)) {
+            difficulty = Math.min(1.0, difficulty + 0.03);
+            stability = stability + 0.7;
+        } else {
+            difficulty = Math.max(0.0, difficulty - 0.04);
+            stability = stability + 1.5;
+        }
+
+        double retrievability = Math.max(0.0, Math.min(1.0, 1.0 - difficulty * 0.5));
+        card.put("difficulty", difficulty);
+        card.put("stability", stability);
+        card.put("retrievability", retrievability);
+
+        long base = "forget".equals(feedback) ? 12 * HOUR : DAY;
+        long bonus = (long) (stability * 0.5 * DAY);
+        return now + Math.max(base, base + bonus);
     }
 
     private void markStudyToday(String userId) {

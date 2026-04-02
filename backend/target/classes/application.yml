@@ -13,3 +13,8 @@ flashback:
   jwt:
     secret: "FlashBack_ChangeThisSecretForProduction_AtLeast32Bytes"
     expire-seconds: 604800
+  feature:
+    enable-v2-schedule: false
+    enable-offline-sync: false
+    enable-media-fields: false
+    enable-metrics: true

@@ -145,9 +145,45 @@ mvn spring-boot:run
 - 集市：
   - 至少两个公开卡组，可立即执行“一键保存到我的库”
 
-## 6. 下一步建议（可选）
+## 6. Sprint 0 基线兼容说明（v1 可并行）
 
-- 将 `Map<String,Object>` 升级为强类型 DTO + 参数校验
-- 引入 JWT 鉴权与多用户登录
-- 热力图由 bitmap(0/1) 扩展为 bitmap + hash 计数分层
+### 6.1 卡片字段兼容（向后兼容）
+
+当前卡片在 v1 字段基础上新增可扩展字段（均为可选，旧前端不传也可运行）：
+
+- `version`：乐观锁版本号（默认 `0`）
+- `difficulty`：难度（默认 `0.3`）
+- `stability`：稳定度（默认 `0.0`）
+- `retrievability`：可提取率（默认 `0.0`）
+- `media`：富媒体扩展对象（默认 `{}`）
+
+### 6.2 v1 接口兼容策略
+
+- 所有现有 `/api/**` 路由保持不变
+- 默认 Feature Flag 关闭时，复习调度仍使用 v1 逻辑
+- 仅当 `flashback.feature.enable-v2-schedule=true` 时，启用扩展调度字段参与计算
+
+### 6.3 埋点（可回滚）
+
+当 `flashback.feature.enable-metrics=true` 时，记录：
+
+- `request_latency`：接口响应时延（path / method / status / cost_ms）
+- `review_metrics`：复习事件埋点（每日复习卡片数、完成率）
+
+### 6.4 回滚策略（Feature Flag）
+
+配置位于 `application.yml`：
+
+- `flashback.feature.enable-v2-schedule`
+- `flashback.feature.enable-offline-sync`
+- `flashback.feature.enable-media-fields`
+- `flashback.feature.enable-metrics`
+
+出现回归时可快速关闭对应开关实现回滚。
+
+## 7. 下一步建议（可选）
+
+- 将 `Map<String,Object>` 进一步升级为强类型响应 DTO
+- 引入统一监控上报（Prometheus + Grafana）
+- 完成离线队列同步与冲突可视化
 - 增加接口测试（Spring Boot Test + Testcontainers Redis）

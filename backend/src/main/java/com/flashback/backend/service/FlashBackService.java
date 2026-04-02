@@ -2,6 +2,7 @@ package com.flashback.backend.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flashback.backend.exception.BizException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class FlashBackService {
     private String cardKey(String cardId) { return "fb:card:" + cardId; }
     private String reviewZsetKey(String userId) { return "fb:review:zset:" + userId; }
     private String heatBitmapKey(String userId, int year) { return "fb:study:bitmap:" + userId + ":" + year; }
+    private String heatCountHashKey(String userId, int yearMonth) { return "fb:study:count:" + userId + ":" + yearMonth; }
     private String marketDeckZsetKey() { return "fb:market:decks"; }
 
     private String toJson(Object value) {
@@ -164,6 +166,7 @@ public class FlashBackService {
         card.put("mastery_level", 0);
         card.put("last_review_time", 0);
         card.put("next_review_time", 0);
+        card.put("version", 0);
         card.put("created_at", now);
         redis.opsForValue().set(cardKey(cardId), toJson(card));
         redis.opsForSet().add(deckCardSetKey(deckId), cardId);
@@ -171,12 +174,19 @@ public class FlashBackService {
         return card;
     }
 
-    public boolean updateCard(String userId, String deckId, String cardId, Map<String, Object> payload) {
+    public boolean updateCard(String userId, String deckId, String cardId, Map<String, Object> payload, long expectedVersion) {
         Map<String, Object> card = fromJsonMap(redis.opsForValue().get(cardKey(cardId)));
         if (card.isEmpty()) return false;
         if (!userId.equals(card.get("user_id")) || !deckId.equals(card.get("deck_id"))) return false;
+
+        long currentVersion = ((Number) card.getOrDefault("version", 0)).longValue();
+        if (currentVersion != expectedVersion) {
+            throw new BizException("知识点已在其他地方更新，请刷新后重试");
+        }
+
         card.put("front_text", String.valueOf(payload.getOrDefault("front", card.getOrDefault("front_text", ""))));
         card.put("back_text", String.valueOf(payload.getOrDefault("back", card.getOrDefault("back_text", ""))));
+        card.put("version", currentVersion + 1);
         redis.opsForValue().set(cardKey(cardId), toJson(card));
         return true;
     }
@@ -191,10 +201,15 @@ public class FlashBackService {
         return true;
     }
 
-    public Map<String, Object> reviewCard(String userId, String deckId, String cardId, String feedback) {
+    public Map<String, Object> reviewCard(String userId, String deckId, String cardId, String feedback, long expectedVersion) {
         Map<String, Object> card = fromJsonMap(redis.opsForValue().get(cardKey(cardId)));
         if (card.isEmpty()) return null;
         if (!userId.equals(card.get("user_id")) || !deckId.equals(card.get("deck_id"))) return null;
+
+        long currentVersion = ((Number) card.getOrDefault("version", 0)).longValue();
+        if (currentVersion != expectedVersion) {
+            throw new BizException("知识点已在其他地方更新，请刷新后重试");
+        }
 
         long now = System.currentTimeMillis();
         int level = ((Number) card.getOrDefault("mastery_level", 0)).intValue();
@@ -207,6 +222,7 @@ public class FlashBackService {
         card.put("review_count", ((Number) card.getOrDefault("review_count", 0)).intValue() + 1);
         card.put("last_review_time", now);
         card.put("next_review_time", nextReview);
+        card.put("version", currentVersion + 1);
         redis.opsForValue().set(cardKey(cardId), toJson(card));
 
         redis.opsForZSet().add(reviewZsetKey(userId), cardId, nextReview);
@@ -285,10 +301,25 @@ public class FlashBackService {
             LocalDate d = today.minusDays(i);
             int year = d.getYear();
             int offset = d.getDayOfYear() - 1;
+            int yearMonth = year * 100 + d.getMonthValue();
+            String dayField = String.format("%02d", d.getDayOfMonth());
+
             Boolean done = redis.opsForValue().getBit(heatBitmapKey(userId, year), offset);
+            Object rawCount = redis.opsForHash().get(heatCountHashKey(userId, yearMonth), dayField);
+            int count = 0;
+            if (rawCount != null) {
+                try {
+                    count = Integer.parseInt(String.valueOf(rawCount));
+                } catch (NumberFormatException ignored) {
+                    count = 0;
+                }
+            } else if (Boolean.TRUE.equals(done)) {
+                count = 1;
+            }
+
             Map<String, Object> item = new HashMap<>();
             item.put("date", d.toString());
-            item.put("count", Boolean.TRUE.equals(done) ? 1 : 0);
+            item.put("count", count);
             list.add(item);
         }
         return list;
@@ -308,8 +339,16 @@ public class FlashBackService {
     private void markStudyToday(String userId) {
         LocalDate now = LocalDate.now();
         int dayOffset = now.getDayOfYear() - 1;
+        int yearMonth = now.getYear() * 100 + now.getMonthValue();
+        String dayField = String.format("%02d", now.getDayOfMonth());
+
         redis.opsForValue().setBit(heatBitmapKey(userId, now.getYear()), dayOffset, true);
         redis.expire(heatBitmapKey(userId, now.getYear()), 400, TimeUnit.DAYS);
+
+        Long count = redis.opsForHash().increment(heatCountHashKey(userId, yearMonth), dayField, 1);
+        if (count != null) {
+            redis.expire(heatCountHashKey(userId, yearMonth), 400, TimeUnit.DAYS);
+        }
     }
 
     private void seedIfEmpty(String userId) {
@@ -397,25 +436,25 @@ public class FlashBackService {
         ));
 
         // ========== 复习行为：构造 forget / blur / master 混合轨迹 ==========
-        reviewCard(userId, osDeckId, String.valueOf(os1.get("id")), "forget");
-        reviewCard(userId, osDeckId, String.valueOf(os2.get("id")), "blur");
-        reviewCard(userId, osDeckId, String.valueOf(os3.get("id")), "master");
+        reviewCard(userId, osDeckId, String.valueOf(os1.get("id")), "forget", 0);
+        reviewCard(userId, osDeckId, String.valueOf(os2.get("id")), "blur", 0);
+        reviewCard(userId, osDeckId, String.valueOf(os3.get("id")), "master", 0);
 
-        reviewCard(userId, algoDeckId, String.valueOf(al1.get("id")), "master");
-        reviewCard(userId, algoDeckId, String.valueOf(al2.get("id")), "blur");
-        reviewCard(userId, algoDeckId, String.valueOf(al3.get("id")), "forget");
+        reviewCard(userId, algoDeckId, String.valueOf(al1.get("id")), "master", 0);
+        reviewCard(userId, algoDeckId, String.valueOf(al2.get("id")), "blur", 0);
+        reviewCard(userId, algoDeckId, String.valueOf(al3.get("id")), "forget", 0);
 
-        reviewCard(userId, feDeckId, String.valueOf(fe1.get("id")), "master");
-        reviewCard(userId, feDeckId, String.valueOf(fe2.get("id")), "blur");
-        reviewCard(userId, feDeckId, String.valueOf(fe3.get("id")), "master");
+        reviewCard(userId, feDeckId, String.valueOf(fe1.get("id")), "master", 0);
+        reviewCard(userId, feDeckId, String.valueOf(fe2.get("id")), "blur", 0);
+        reviewCard(userId, feDeckId, String.valueOf(fe3.get("id")), "master", 0);
 
-        reviewCard(userId, netDeckId, String.valueOf(n1.get("id")), "blur");
-        reviewCard(userId, netDeckId, String.valueOf(n2.get("id")), "forget");
-        reviewCard(userId, netDeckId, String.valueOf(n3.get("id")), "master");
+        reviewCard(userId, netDeckId, String.valueOf(n1.get("id")), "blur", 0);
+        reviewCard(userId, netDeckId, String.valueOf(n2.get("id")), "forget", 0);
+        reviewCard(userId, netDeckId, String.valueOf(n3.get("id")), "master", 0);
 
-        reviewCard(userId, dbDeckId, String.valueOf(db1.get("id")), "master");
-        reviewCard(userId, dbDeckId, String.valueOf(db2.get("id")), "blur");
-        reviewCard(userId, dbDeckId, String.valueOf(db3.get("id")), "forget");
+        reviewCard(userId, dbDeckId, String.valueOf(db1.get("id")), "master", 0);
+        reviewCard(userId, dbDeckId, String.valueOf(db2.get("id")), "blur", 0);
+        reviewCard(userId, dbDeckId, String.valueOf(db3.get("id")), "forget", 0);
 
         // 手动调整部分卡片到期时间，确保首页“待复习”有明显分层
         long now = System.currentTimeMillis();

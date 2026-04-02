@@ -1,6 +1,6 @@
 package com.flashback.backend.controller;
 
-import com.flashback.backend.auth.CurrentUserContext;
+import com.flashback.backend.auth.CurrentUserId;
 import com.flashback.backend.auth.JwtService;
 import com.flashback.backend.dto.ApiResponse;
 import com.flashback.backend.dto.request.CreateDeckRequest;
@@ -8,6 +8,7 @@ import com.flashback.backend.dto.request.LoginRequest;
 import com.flashback.backend.dto.request.RenameDeckRequest;
 import com.flashback.backend.dto.request.ReviewCardRequest;
 import com.flashback.backend.dto.request.ToggleDeckPublicRequest;
+import com.flashback.backend.dto.request.UpdateCardRequest;
 import com.flashback.backend.dto.request.UpdateProfileRequest;
 import com.flashback.backend.dto.request.UpsertCardRequest;
 import com.flashback.backend.exception.BizException;
@@ -41,119 +42,123 @@ public class FlashBackController {
     }
 
     @GetMapping("/profile")
-    public ApiResponse<Map<String, Object>> profile() {
-        return ApiResponse.ok(service.ensureUser(currentUserId()));
+    public ApiResponse<Map<String, Object>> profile(@CurrentUserId String userId) {
+        return ApiResponse.ok(service.ensureUser(userId));
     }
 
     @PutMapping("/profile")
-    public ApiResponse<Map<String, Object>> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+    public ApiResponse<Map<String, Object>> updateProfile(@CurrentUserId String userId,
+                                                           @Valid @RequestBody UpdateProfileRequest request) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("nickname", request.nickname());
         payload.put("goal", request.goal());
-        return ApiResponse.ok(service.updateUser(currentUserId(), payload));
+        return ApiResponse.ok(service.updateUser(userId, payload));
     }
 
     @GetMapping("/decks")
-    public ApiResponse<List<Map<String, Object>>> decks() {
-        return ApiResponse.ok(service.getDecks(currentUserId()));
+    public ApiResponse<List<Map<String, Object>>> decks(@CurrentUserId String userId) {
+        return ApiResponse.ok(service.getDecks(userId));
     }
 
     @PostMapping("/decks")
-    public ApiResponse<Map<String, Object>> createDeck(@Valid @RequestBody CreateDeckRequest request) {
-        return ApiResponse.ok(service.createDeck(currentUserId(), request.name().trim()));
+    public ApiResponse<Map<String, Object>> createDeck(@CurrentUserId String userId,
+                                                        @Valid @RequestBody CreateDeckRequest request) {
+        return ApiResponse.ok(service.createDeck(userId, request.name().trim()));
     }
 
     @GetMapping("/decks/{deckId}")
-    public ApiResponse<Map<String, Object>> deck(@PathVariable String deckId) {
-        Map<String, Object> deck = service.getDeckById(currentUserId(), deckId);
+    public ApiResponse<Map<String, Object>> deck(@CurrentUserId String userId,
+                                                  @PathVariable String deckId) {
+        Map<String, Object> deck = service.getDeckById(userId, deckId);
         if (deck == null) throw new BizException("卡片集不存在");
         return ApiResponse.ok(deck);
     }
 
     @PutMapping("/decks/{deckId}/rename")
-    public ApiResponse<Map<String, Object>> rename(@PathVariable String deckId,
+    public ApiResponse<Map<String, Object>> rename(@CurrentUserId String userId,
+                                                    @PathVariable String deckId,
                                                     @Valid @RequestBody RenameDeckRequest request) {
-        boolean ok = service.renameDeck(currentUserId(), deckId, request.name().trim());
+        boolean ok = service.renameDeck(userId, deckId, request.name().trim());
         if (!ok) throw new BizException("卡片集不存在");
         return ApiResponse.ok(new HashMap<>());
     }
 
     @PutMapping("/decks/{deckId}/public")
-    public ApiResponse<Map<String, Object>> togglePublic(@PathVariable String deckId,
+    public ApiResponse<Map<String, Object>> togglePublic(@CurrentUserId String userId,
+                                                          @PathVariable String deckId,
                                                           @Valid @RequestBody ToggleDeckPublicRequest request) {
-        boolean ok = service.toggleDeckPublic(currentUserId(), deckId, request.value());
+        boolean ok = service.toggleDeckPublic(userId, deckId, request.value());
         if (!ok) throw new BizException("卡片集不存在");
         return ApiResponse.ok(new HashMap<>());
     }
 
     @PostMapping("/decks/{deckId}/cards")
-    public ApiResponse<Map<String, Object>> addCard(@PathVariable String deckId,
+    public ApiResponse<Map<String, Object>> addCard(@CurrentUserId String userId,
+                                                     @PathVariable String deckId,
                                                      @Valid @RequestBody UpsertCardRequest request) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("front", request.front());
         payload.put("back", request.back());
-        Map<String, Object> card = service.addCard(currentUserId(), deckId, payload);
+        Map<String, Object> card = service.addCard(userId, deckId, payload);
         if (card == null) throw new BizException("卡片集不存在");
         return ApiResponse.ok(card);
     }
 
     @PutMapping("/decks/{deckId}/cards/{cardId}")
-    public ApiResponse<Map<String, Object>> updateCard(@PathVariable String deckId,
+    public ApiResponse<Map<String, Object>> updateCard(@CurrentUserId String userId,
+                                                        @PathVariable String deckId,
                                                         @PathVariable String cardId,
-                                                        @Valid @RequestBody UpsertCardRequest request) {
+                                                        @Valid @RequestBody UpdateCardRequest request) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("front", request.front());
         payload.put("back", request.back());
-        boolean ok = service.updateCard(currentUserId(), deckId, cardId, payload);
+        boolean ok = service.updateCard(userId, deckId, cardId, payload, request.version());
         if (!ok) throw new BizException("知识点不存在");
         return ApiResponse.ok(new HashMap<>());
     }
 
     @DeleteMapping("/decks/{deckId}/cards/{cardId}")
-    public ApiResponse<Map<String, Object>> deleteCard(@PathVariable String deckId,
+    public ApiResponse<Map<String, Object>> deleteCard(@CurrentUserId String userId,
+                                                        @PathVariable String deckId,
                                                         @PathVariable String cardId) {
-        boolean ok = service.deleteCard(currentUserId(), deckId, cardId);
+        boolean ok = service.deleteCard(userId, deckId, cardId);
         if (!ok) throw new BizException("知识点不存在");
         return ApiResponse.ok(new HashMap<>());
     }
 
     @PostMapping("/decks/{deckId}/cards/{cardId}/review")
-    public ApiResponse<Map<String, Object>> reviewCard(@PathVariable String deckId,
+    public ApiResponse<Map<String, Object>> reviewCard(@CurrentUserId String userId,
+                                                        @PathVariable String deckId,
                                                         @PathVariable String cardId,
                                                         @Valid @RequestBody ReviewCardRequest request) {
-        Map<String, Object> card = service.reviewCard(currentUserId(), deckId, cardId, request.feedback());
+        Map<String, Object> card = service.reviewCard(userId, deckId, cardId, request.feedback(), request.version());
         if (card == null) throw new BizException("知识点不存在");
         return ApiResponse.ok(card);
     }
 
     @GetMapping("/review/due")
-    public ApiResponse<List<Map<String, Object>>> due() {
-        return ApiResponse.ok(service.getDueCards(currentUserId()));
+    public ApiResponse<List<Map<String, Object>>> due(@CurrentUserId String userId) {
+        return ApiResponse.ok(service.getDueCards(userId));
     }
 
     @GetMapping("/market/decks")
-    public ApiResponse<List<Map<String, Object>>> market(@RequestParam(defaultValue = "1") int page,
+    public ApiResponse<List<Map<String, Object>>> market(@CurrentUserId String userId,
+                                                          @RequestParam(defaultValue = "1") int page,
                                                           @RequestParam(defaultValue = "20") int pageSize) {
-        return ApiResponse.ok(service.getPublicDecks(currentUserId(), page, pageSize));
+        return ApiResponse.ok(service.getPublicDecks(userId, page, pageSize));
     }
 
     @PostMapping("/market/decks/{deckId}/clone")
-    public ApiResponse<Map<String, Object>> cloneDeck(@PathVariable String deckId) {
-        Map<String, Object> deck = service.clonePublicDeck(currentUserId(), deckId);
+    public ApiResponse<Map<String, Object>> cloneDeck(@CurrentUserId String userId,
+                                                       @PathVariable String deckId) {
+        Map<String, Object> deck = service.clonePublicDeck(userId, deckId);
         if (deck == null) throw new BizException("公开卡片集不存在");
         return ApiResponse.ok(deck);
     }
 
     @GetMapping("/study/heatmap")
-    public ApiResponse<List<Map<String, Object>>> heatmap(@RequestParam(defaultValue = "120") int days) {
-        return ApiResponse.ok(service.getHeatmap(currentUserId(), days));
-    }
-
-    private String currentUserId() {
-        String userId = CurrentUserContext.get();
-        if (userId == null || userId.isBlank()) {
-            throw new BizException("未登录");
-        }
-        return userId;
+    public ApiResponse<List<Map<String, Object>>> heatmap(@CurrentUserId String userId,
+                                                           @RequestParam(defaultValue = "120") int days) {
+        return ApiResponse.ok(service.getHeatmap(userId, days));
     }
 }

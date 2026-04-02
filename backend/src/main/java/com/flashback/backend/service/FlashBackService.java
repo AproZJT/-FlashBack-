@@ -449,6 +449,57 @@ public class FlashBackService {
         return report;
     }
 
+    public Map<String, Object> seedDemoData(String userId) {
+        ensureUser(userId);
+        long now = System.currentTimeMillis();
+
+        Map<String, Object> mediaDeck = createDeck(userId, "Phase4-富媒体演示");
+        String mediaDeckId = String.valueOf(mediaDeck.get("id"));
+
+        for (int i = 1; i <= 18; i++) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("front", "演示题 " + i + "：请描述概念与应用场景");
+            payload.put("back", "这是第 " + i + " 题的解析，包含要点与示例。");
+            payload.put("front_image_url", "https://picsum.photos/seed/front" + i + "/420/220");
+            payload.put("back_image_url", "https://picsum.photos/seed/back" + i + "/420/220");
+            payload.put("audio_url", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3");
+            Map<String, Object> card = addCard(userId, mediaDeckId, payload);
+            if (card == null) continue;
+
+            String cardId = String.valueOf(card.get("id"));
+            int lvl = i % 4;
+            String fb = switch (lvl) {
+                case 0 -> "again";
+                case 1 -> "hard";
+                case 2 -> "good";
+                default -> "easy";
+            };
+            reviewCard(userId, mediaDeckId, cardId, fb, 0);
+            redis.opsForZSet().add(reviewZsetKey(userId), cardId, now - (i * HOUR));
+        }
+
+        int[] counts = new int[] {0, 3, 10, 22, 40};
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < 35; i++) {
+            LocalDate d = today.minusDays(i);
+            int bucket = i % counts.length;
+            int count = counts[bucket];
+            int yearMonth = d.getYear() * 100 + d.getMonthValue();
+            String dayField = String.format("%02d", d.getDayOfMonth());
+            if (count > 0) {
+                redis.opsForHash().put(heatCountHashKey(userId, yearMonth), dayField, String.valueOf(count));
+                redis.opsForValue().setBit(heatBitmapKey(userId, d.getYear()), d.getDayOfYear() - 1, true);
+            }
+        }
+
+        Map<String, Object> report = new HashMap<>();
+        report.put("ok", true);
+        report.put("deckId", mediaDeckId);
+        report.put("cardsAdded", 18);
+        report.put("message", "演示数据已注入，可直接观察主题、热力图、富媒体与复习反馈效果");
+        return report;
+    }
+
     private void seedIfEmpty(String userId) {
         Long size = redis.opsForSet().size(userDeckSetKey(userId));
         if (size != null && size > 0) return;

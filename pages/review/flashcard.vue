@@ -285,7 +285,7 @@ export default {
 .top-nav {
   margin: 24rpx 24rpx 0;
   height: 86rpx;
-  border-radius: 20rpx;
+  border-radius: $fb-radius-card;
   background: $fb-bg-surface;
   border: 1rpx solid $fb-border;
   display: flex;

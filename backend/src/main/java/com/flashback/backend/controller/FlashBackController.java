@@ -174,4 +174,9 @@ public class FlashBackController {
                                                        @Valid @RequestBody CsvImportRequest request) {
         return ApiResponse.ok(service.importCsv(userId, request.csvContent(), request.defaultDeckName()));
     }
+
+    @PostMapping("/dev/seed-demo")
+    public ApiResponse<Map<String, Object>> seedDemo(@CurrentUserId String userId) {
+        return ApiResponse.ok(service.seedDemoData(userId));
+    }
 }

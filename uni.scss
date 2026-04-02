@@ -20,11 +20,24 @@ $fb-bg-surface: #ffffff;
 $fb-border: #d8ebff;
 $fb-text-primary: #244f88;
 $fb-text-secondary: #6f88ae;
+$fb-text-accent: #5f41f6;
+
+$fb-radius-card: 20rpx;
+$fb-radius-nav: 26rpx;
+$fb-space-page: 22rpx;
+$fb-shadow-card: 0 8rpx 18rpx rgba(84, 136, 194, 0.08);
+$fb-shadow-nav: 0 10rpx 24rpx rgba(88, 139, 193, 0.15);
 
 $fb-review-again: #ef4444;   // red
 $fb-review-hard: #f59e0b;    // orange
 $fb-review-good: #64748b;    // gray-blue
 $fb-review-easy: #16a34a;    // green
+
+$fb-heat-lv0: #edf4ff;
+$fb-heat-lv1: #ccebdd;
+$fb-heat-lv2: #8fdac7;
+$fb-heat-lv3: #4fb8a7;
+$fb-heat-lv4: #1f8a70;
 
 /* 颜色变量 */
 

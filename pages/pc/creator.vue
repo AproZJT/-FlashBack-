@@ -111,24 +111,24 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: #f5f9ff; padding: 16rpx; box-sizing: border-box; }
-.top-nav { height: 82rpx; background: #fff; border: 1rpx solid #d8ebff; border-radius: 16rpx; display:flex; align-items:center; justify-content:space-between; padding: 0 16rpx; }
-.title { color:#234d86; font-size:30rpx; font-weight:700; }
+.page { min-height: 100vh; background: $fb-bg-page; padding: 16rpx; box-sizing: border-box; }
+.top-nav { height: 82rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: 16rpx; display:flex; align-items:center; justify-content:space-between; padding: 0 16rpx; }
+.title { color:$fb-text-primary; font-size:30rpx; font-weight:700; }
 .actions-right { display:flex; gap: 12rpx; }
-.action { color:#5f41f6; font-size:24rpx; }
-.toolbar { margin-top: 12rpx; background:#fff; border:1rpx solid #d8ebff; border-radius:16rpx; padding:12rpx; display:flex; gap:10rpx; align-items:center; }
-.picker { width: 280rpx; height: 70rpx; line-height:70rpx; border:1rpx solid #d8ebff; border-radius:12rpx; padding:0 12rpx; color:#244f88; }
+.action { color:$fb-text-accent; font-size:24rpx; }
+.toolbar { margin-top: 12rpx; background:$fb-bg-surface; border:1rpx solid $fb-border; border-radius:16rpx; padding:12rpx; display:flex; gap:10rpx; align-items:center; }
+.picker { width: 280rpx; height: 70rpx; line-height:70rpx; border:1rpx solid $fb-border; border-radius:12rpx; padding:0 12rpx; color:$fb-text-primary; }
 .btn { height:70rpx; line-height:70rpx; border-radius:36rpx; background:#e5eefc; color:#35598f; padding: 0 20rpx; }
-.btn.primary { background:#16a34a; color:#fff; }
-.table-wrap { margin-top: 12rpx; height: calc(100vh - 290rpx); background:#fff; border:1rpx solid #d8ebff; border-radius:16rpx; }
+.btn.primary { background:$fb-review-easy; color:#fff; }
+.table-wrap { margin-top: 12rpx; height: calc(100vh - 290rpx); background:$fb-bg-surface; border:1rpx solid $fb-border; border-radius:16rpx; }
 .row { display:flex; align-items:center; border-bottom:1rpx solid #edf4ff; padding: 8rpx 10rpx; }
 .thead { background:#f3f8ff; position: sticky; top: 0; z-index: 3; }
-.col { color:#3c5f90; font-size:22rpx; }
+.col { color:$fb-text-primary; font-size:22rpx; }
 .idx { width: 56rpx; }
 .front { width: 24%; }
 .back { width: 30%; }
 .media { width: 23%; }
-.input { height: 62rpx; border:1rpx solid #d8ebff; border-radius:10rpx; padding: 0 10rpx; box-sizing:border-box; background:#fff; color:#244f88; }
+.input { height: 62rpx; border:1rpx solid $fb-border; border-radius:10rpx; padding: 0 10rpx; box-sizing:border-box; background:$fb-bg-surface; color:$fb-text-primary; }
 .foot { margin-top: 10rpx; }
-.tip { color:#6f88ae; font-size:22rpx; }
+.tip { color:$fb-text-secondary; font-size:22rpx; }
 </style>

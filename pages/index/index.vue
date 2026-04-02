@@ -3,6 +3,7 @@
     <view class="top-nav">
       <text class="nav-title">FlashBack</text>
       <view class="nav-actions">
+        <view class="nav-action ghost" @tap="toggleThemeMode">主题</view>
         <view class="nav-action ghost" @tap="goPcCreator">PC制卡</view>
         <view class="nav-action ghost" @tap="goImport">导入</view>
         <view class="nav-action" @tap="openCreateDialog">+ 新建</view>
@@ -30,7 +31,7 @@
       <switch color="#22c55e" :checked="onlyDue" @change="toggleOnlyDue" />
     </view>
 
-    <view v-if="decks.length" class="deck-list">
+    <view v-if="decks.length" class="deck-grid">
       <view
         v-for="deck in decks"
         :key="deck.id"
@@ -39,8 +40,16 @@
         @tap="goDeck(deck.id)"
         @longpress="openRenameDeck(deck)"
       >
+        <view class="deck-badge">待复习 {{ deckDue(deck) }}</view>
         <view class="deck-name">{{ deck.name }}</view>
-        <view class="deck-meta">{{ deck.cards.length }} 个知识点 · 长按重命名</view>
+        <view class="deck-meta">{{ deck.cards.length }} 个知识点</view>
+        <view class="deck-progress-row">
+          <view class="deck-progress-track">
+            <view class="deck-progress-fill" :style="{ width: `${deckProgress(deck)}%` }"></view>
+          </view>
+          <text class="deck-progress-text">{{ deckProgress(deck) }}%</text>
+        </view>
+        <view class="deck-update">最近更新：{{ formatTime(deck.createdAt || 0) }}</view>
       </view>
     </view>
 
@@ -59,6 +68,7 @@
 
 <script>
 import { getDecks, createDeck, renameDeck, getUserProfile, getDueReviewCards, getOfflineQueueMeta } from '@/utils/storage.js';
+import { toggleTheme } from '@/utils/theme.js';
 
 function countDue(cards = [], now = Date.now()) {
   return (cards || []).filter(card => !card.next_review_time || Number(card.next_review_time) <= now).length;
@@ -160,93 +170,74 @@ export default {
     },
     goPcCreator() {
       uni.navigateTo({ url: '/pages/pc/creator' });
+    },
+    toggleThemeMode() {
+      const next = toggleTheme();
+      uni.showToast({ title: next === 'dark' ? '已切换深色' : '已切换浅色', icon: 'none' });
+    },
+    deckDue(deck) {
+      return countDue(deck.cards || []);
+    },
+    deckProgress(deck) {
+      const cards = deck.cards || [];
+      if (!cards.length) return 0;
+      const mastered = cards.filter(c => Number(c.mastery_level || 0) >= 2).length;
+      return Math.min(100, Math.round((mastered / cards.length) * 100));
+    },
+    formatTime(ts) {
+      if (!ts) return '--';
+      const d = new Date(Number(ts));
+      const m = `${d.getMonth() + 1}`.padStart(2, '0');
+      const day = `${d.getDate()}`.padStart(2, '0');
+      return `${m}-${day}`;
     }
   }
 };
 </script>
 
 <style lang="scss">
-.page {
-  min-height: 100vh;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 60%, #edf9f7 100%);
-  padding: 22rpx 22rpx 130rpx;
-  box-sizing: border-box;
-}
+.page { min-height: 100vh; background: $fb-bg-page; padding: $fb-space-page $fb-space-page 130rpx; box-sizing: border-box; }
 .top-nav {
-  height: 90rpx;
-  border-radius: 24rpx;
-  background: #ffffff;
-  border: 1rpx solid #d8ebff;
-  box-shadow: 0 10rpx 24rpx rgba(85, 141, 204, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24rpx;
+  height: 90rpx; border-radius: $fb-radius-card; background: $fb-bg-surface; border: 1rpx solid $fb-border;
+  box-shadow: $fb-shadow-card; display: flex; align-items: center; justify-content: space-between; padding: 0 24rpx;
 }
-.nav-title { color: #2362b2; font-size: 32rpx; font-weight: 700; }
-.nav-action { color: #6b4dfb; font-size: 26rpx; font-weight: 600; }
+.nav-title { color: $fb-text-primary; font-size: 32rpx; font-weight: 700; }
+.nav-actions { display: flex; align-items: center; gap: 12rpx; }
+.nav-action { color: $fb-text-accent; font-size: 24rpx; font-weight: 600; }
+.nav-action.ghost { color: $fb-text-secondary; }
 .profile-card {
-  margin-top: 14rpx;
-  background: linear-gradient(135deg, #6ecbff 0%, #8de0dc 100%);
-  border-radius: 24rpx;
-  padding: 20rpx;
-  display: flex;
-  align-items: center;
+  margin-top: 14rpx; background: linear-gradient(135deg, #6ecbff 0%, #8de0dc 100%);
+  border-radius: $fb-radius-card; padding: 20rpx; display: flex; align-items: center;
   box-shadow: 0 14rpx 26rpx rgba(94, 192, 229, 0.2);
 }
 .avatar {
-  width: 74rpx; height: 74rpx; border-radius: 37rpx;
-  background: rgba(255, 255, 255, 0.9);
-  color: #2a79b9; display: flex; align-items: center; justify-content: center;
-  font-size: 30rpx; font-weight: 700;
+  width: 74rpx; height: 74rpx; border-radius: 37rpx; background: rgba(255, 255, 255, 0.9);
+  color: #2a79b9; display: flex; align-items: center; justify-content: center; font-size: 30rpx; font-weight: 700;
 }
 .profile-info { margin-left: 14rpx; flex: 1; }
 .nickname { color: #fff; font-size: 28rpx; font-weight: 700; display: block; }
 .goal { color: rgba(255,255,255,0.92); font-size: 22rpx; margin-top: 4rpx; display: block; }
 .arrow { color: #fff; font-size: 34rpx; }
-.due-card {
-  margin-top: 12rpx;
-  background: #ffffff;
-  border: 1rpx solid #d8ebff;
-  border-radius: 22rpx;
-  padding: 18rpx 20rpx;
-  box-shadow: 0 10rpx 22rpx rgba(66, 123, 180, 0.08);
-}
-.due-title { color: #5f7ca8; font-size: 22rpx; display: block; }
-.due-value { color: #5b3ff2; font-size: 40rpx; font-weight: 800; display: block; margin-top: 6rpx; }
-.due-tip { color: #7f98bf; font-size: 20rpx; display: block; margin-top: 4rpx; }
-.filter-row {
-  margin-top: 10rpx;
-  background: #ffffff;
-  border: 1rpx solid #d8ebff;
-  border-radius: 18rpx;
-  padding: 14rpx 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.filter-label { color: #4d6d9b; font-size: 24rpx; }
-.deck-list { margin-top: 14rpx; display: flex; flex-direction: column; gap: 10rpx; }
-.deck-card {
-  background: #ffffff;
-  border: 1rpx solid #d8ebff;
-  border-radius: 20rpx;
-  padding: 18rpx 20rpx;
-  box-shadow: 0 8rpx 18rpx rgba(84, 136, 194, 0.08);
-}
-.deck-name { color: #254f88; font-size: 30rpx; font-weight: 700; }
-.deck-meta { margin-top: 6rpx; color: #6f88ae; font-size: 22rpx; }
+.due-card { margin-top: 12rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-card; padding: 18rpx 20rpx; box-shadow: $fb-shadow-card; }
+.due-title { color: $fb-text-secondary; font-size: 22rpx; display: block; }
+.due-value { color: $fb-text-accent; font-size: 40rpx; font-weight: 800; display: block; margin-top: 6rpx; }
+.due-tip,.offline-tip { color: $fb-text-secondary; font-size: 20rpx; display: block; margin-top: 4rpx; }
+.filter-row { margin-top: 10rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: 18rpx; padding: 14rpx 18rpx; display: flex; align-items: center; justify-content: space-between; }
+.filter-label { color: $fb-text-primary; font-size: 24rpx; }
+.deck-grid { margin-top: 14rpx; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10rpx; }
+.deck-card { background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-card; padding: 16rpx; box-shadow: $fb-shadow-card; }
+.deck-badge { display: inline-block; padding: 6rpx 12rpx; border-radius: 999rpx; font-size: 20rpx; color: #178a57; background: #def9ec; }
+.deck-name { margin-top: 10rpx; color: $fb-text-primary; font-size: 28rpx; font-weight: 700; }
+.deck-meta { margin-top: 4rpx; color: $fb-text-secondary; font-size: 22rpx; }
+.deck-progress-row { margin-top: 10rpx; display: flex; align-items: center; gap: 8rpx; }
+.deck-progress-track { flex: 1; height: 10rpx; border-radius: 999rpx; background: #e9f1ff; overflow: hidden; }
+.deck-progress-fill { height: 100%; border-radius: 999rpx; background: linear-gradient(90deg, #5e9dff 0%, #35c58e 100%); }
+.deck-progress-text { color: $fb-text-secondary; font-size: 20rpx; }
+.deck-update { margin-top: 8rpx; color: $fb-text-secondary; font-size: 20rpx; }
 .empty-wrap { margin-top: 220rpx; text-align: center; }
-.empty-title { color: #5376a8; font-size: 32rpx; }
-.empty-tip { color: #86a2c7; font-size: 23rpx; margin-top: 8rpx; display: block; }
-.bottom-nav {
-  position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx;
-  background: #ffffff;
-  border: 1rpx solid #d8ebff;
-  border-radius: 26rpx;
-  box-shadow: 0 10rpx 24rpx rgba(88, 139, 193, 0.15);
-  height: 94rpx; display: flex; align-items: center;
-}
-.nav-item { flex: 1; text-align: center; color: #7b95b9; font-size: 26rpx; }
-.nav-item.active { color: #5f41f6; font-weight: 700; }
+.empty-title { color: $fb-text-primary; font-size: 32rpx; }
+.empty-tip { color: $fb-text-secondary; font-size: 23rpx; margin-top: 8rpx; display: block; }
+.bottom-nav { position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-nav; box-shadow: $fb-shadow-nav; height: 94rpx; display: flex; align-items: center; }
+.nav-item { flex: 1; text-align: center; color: $fb-text-secondary; font-size: 26rpx; }
+.nav-item.active { color: $fb-text-accent; font-weight: 700; }
 </style>

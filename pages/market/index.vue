@@ -61,33 +61,33 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 60%, #edf9f7 100%); padding: 22rpx 22rpx 130rpx; box-sizing: border-box; }
+.page { min-height: 100vh; background: $fb-bg-page; padding: $fb-space-page $fb-space-page 130rpx; box-sizing: border-box; }
 .top-nav {
-  height: 90rpx; border-radius: 24rpx; background: #fff; border: 1rpx solid #d8ebff;
-  box-shadow: 0 10rpx 24rpx rgba(85, 141, 204, 0.08);
+  height: 90rpx; border-radius: $fb-radius-card; background: $fb-bg-surface; border: 1rpx solid $fb-border;
+  box-shadow: $fb-shadow-card;
   display:flex; align-items:center; justify-content:space-between; padding:0 24rpx;
 }
-.nav-title { color:#2362b2; font-size:32rpx; font-weight:700; }
-.nav-action { color:#6b4dfb; font-weight: 600; }
+.nav-title { color:$fb-text-primary; font-size:32rpx; font-weight:700; }
+.nav-action { color:$fb-text-accent; font-weight: 600; }
 .list { margin-top: 14rpx; display:flex; flex-direction:column; gap:10rpx; }
 .item {
-  background:#fff; border:1rpx solid #d8ebff; border-radius:20rpx; padding:18rpx 20rpx;
-  box-shadow: 0 8rpx 18rpx rgba(84, 136, 194, 0.08);
+  background:$fb-bg-surface; border:1rpx solid $fb-border; border-radius:$fb-radius-card; padding:18rpx 20rpx;
+  box-shadow: $fb-shadow-card;
   display:flex; justify-content:space-between; align-items:center;
 }
-.name { color:#254f88; font-size:28rpx; font-weight: 700; display:block; }
-.meta { color:#6f88ae; font-size:22rpx; margin-top:6rpx; display:block; }
+.name { color:$fb-text-primary; font-size:28rpx; font-weight: 700; display:block; }
+.meta { color:$fb-text-secondary; font-size:22rpx; margin-top:6rpx; display:block; }
 .clone {
   background: linear-gradient(135deg, #6ecbff 0%, #6b4dfb 100%);
   color:#fff; border-radius:30rpx; font-size:22rpx; padding:0 20rpx; border: 0;
 }
-.empty { color:#86a2c7; text-align:center; margin-top:220rpx; }
+.empty { color:$fb-text-secondary; text-align:center; margin-top:220rpx; }
 .bottom-nav {
   position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx;
-  background: #fff; border: 1rpx solid #d8ebff; border-radius: 26rpx;
-  box-shadow: 0 10rpx 24rpx rgba(88, 139, 193, 0.15);
+  background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-nav;
+  box-shadow: $fb-shadow-nav;
   height: 94rpx; display: flex; align-items: center;
 }
-.nav-item { flex: 1; text-align: center; color: #7b95b9; font-size: 26rpx; }
-.nav-item.active { color: #5f41f6; font-weight: 700; }
+.nav-item { flex: 1; text-align: center; color: $fb-text-secondary; font-size: 26rpx; }
+.nav-item.active { color: $fb-text-accent; font-weight: 700; }
 </style>

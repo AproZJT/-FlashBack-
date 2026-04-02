@@ -397,10 +397,10 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 60%, #edf9f7 100%); padding: 24rpx 24rpx 128rpx; box-sizing: border-box; }
-.top-nav { height: 86rpx; border-radius: 20rpx; background: #ffffff; border: 1rpx solid #d8ebff; display: flex; align-items: center; justify-content: space-between; padding: 0 22rpx; }
-.nav-left,.nav-right { color: #6b4dfb; font-size: 25rpx; font-weight: 600; }
-.nav-title { color: #2362b2; font-size: 28rpx; font-weight: 700; max-width: 360rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page { min-height: 100vh; background: $fb-bg-page; padding: 24rpx 24rpx 128rpx; box-sizing: border-box; }
+.top-nav { height: 86rpx; border-radius: $fb-radius-card; background: $fb-bg-surface; border: 1rpx solid $fb-border; display: flex; align-items: center; justify-content: space-between; padding: 0 22rpx; }
+.nav-left,.nav-right { color: $fb-text-accent; font-size: 25rpx; font-weight: 600; }
+.nav-title { color: $fb-text-primary; font-size: 28rpx; font-weight: 700; max-width: 360rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .publish-row {
   margin-top: 14rpx;
   border: 1rpx solid #d8ebff;

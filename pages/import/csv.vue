@@ -79,17 +79,17 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: #f8fbff; padding: 24rpx; box-sizing: border-box; }
-.top-nav { height: 86rpx; border-radius: 20rpx; background: #fff; border: 1rpx solid #d8ebff; display:flex; align-items:center; justify-content:space-between; padding:0 20rpx; }
-.nav-left,.nav-right { color:#6b4dfb; font-size:24rpx; }
-.nav-title { color:#2362b2; font-size:28rpx; font-weight:700; }
-.panel { margin-top: 16rpx; background:#fff; border:1rpx solid #d8ebff; border-radius:18rpx; padding:20rpx; }
-.label { display:block; color:#4d6d9b; font-size:24rpx; margin-top:10rpx; }
-.input { height:76rpx; border:1rpx solid #d8ebff; border-radius:14rpx; margin-top:8rpx; padding:0 14rpx; color:#244f88; background:#fff; }
-.editor { width:100%; height:380rpx; border:1rpx solid #d8ebff; border-radius:14rpx; margin-top:8rpx; padding:12rpx; box-sizing:border-box; color:#244f88; }
+.page { min-height: 100vh; background: $fb-bg-page; padding: 24rpx; box-sizing: border-box; }
+.top-nav { height: 86rpx; border-radius: $fb-radius-card; background: $fb-bg-surface; border: 1rpx solid $fb-border; display:flex; align-items:center; justify-content:space-between; padding:0 20rpx; }
+.nav-left,.nav-right { color:$fb-text-accent; font-size:24rpx; }
+.nav-title { color:$fb-text-primary; font-size:28rpx; font-weight:700; }
+.panel { margin-top: 16rpx; background:$fb-bg-surface; border:1rpx solid $fb-border; border-radius:18rpx; padding:20rpx; }
+.label { display:block; color:$fb-text-secondary; font-size:24rpx; margin-top:10rpx; }
+.input { height:76rpx; border:1rpx solid $fb-border; border-radius:14rpx; margin-top:8rpx; padding:0 14rpx; color:$fb-text-primary; background:$fb-bg-surface; }
+.editor { width:100%; height:380rpx; border:1rpx solid $fb-border; border-radius:14rpx; margin-top:8rpx; padding:12rpx; box-sizing:border-box; color:$fb-text-primary; }
 .actions { margin-top: 16rpx; display:flex; gap:12rpx; }
 .btn { flex:1; height:82rpx; line-height:82rpx; border-radius:40rpx; background:#e5eefc; color:#35598f; }
-.btn.primary { background:#16a34a; color:#fff; }
+.btn.primary { background:$fb-review-easy; color:#fff; }
 .btn[disabled] { background:#b9c9e4; color:#eef4ff; }
-.report { margin-top:14rpx; display:flex; flex-wrap:wrap; gap:16rpx; color:#5f7ca8; }
+.report { margin-top:14rpx; display:flex; flex-wrap:wrap; gap:16rpx; color:$fb-text-secondary; }
 </style>

@@ -21,7 +21,7 @@
           :class="heatClass(item.count)"
         ></view>
       </view>
-      <text class="panel-item">深色越深，表示当天复习次数越多</text>
+      <text class="panel-item">深色越深，表示当天复习次数越多（0 / 1-5 / 6-15 / 16-30 / 30+）</text>
     </view>
 
     <view class="bottom-nav">
@@ -83,9 +83,9 @@ export default {
       });
     },
     heatClass(count) {
-      if (count >= 6) return 'lv-4';
-      if (count >= 4) return 'lv-3';
-      if (count >= 2) return 'lv-2';
+      if (count >= 31) return 'lv-4';
+      if (count >= 16) return 'lv-3';
+      if (count >= 6) return 'lv-2';
       if (count >= 1) return 'lv-1';
       return 'lv-0';
     },
@@ -103,16 +103,16 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 60%, #edf9f7 100%); padding: 22rpx 22rpx 130rpx; box-sizing: border-box; }
+.page { min-height: 100vh; background: $fb-bg-page; padding: $fb-space-page $fb-space-page 130rpx; box-sizing: border-box; }
 .top-nav {
-  height: 90rpx; border-radius: 24rpx; background: #fff; border: 1rpx solid #d8ebff;
-  box-shadow: 0 10rpx 24rpx rgba(85, 141, 204, 0.08);
+  height: 90rpx; border-radius: $fb-radius-card; background: $fb-bg-surface; border: 1rpx solid $fb-border;
+  box-shadow: $fb-shadow-card;
   display: flex; align-items: center; justify-content: space-between; padding: 0 24rpx;
 }
-.nav-title { color: #2362b2; font-size: 32rpx; font-weight: 700; }
-.nav-action { color: #6b4dfb; font-size: 26rpx; font-weight: 600; }
+.nav-title { color: $fb-text-primary; font-size: 32rpx; font-weight: 700; }
+.nav-action { color: $fb-text-accent; font-size: 26rpx; font-weight: 600; }
 .user-card {
-  margin-top: 14rpx; background: linear-gradient(135deg, #7bc6ff 0%, #89dfd8 100%); border-radius: 24rpx;
+  margin-top: 14rpx; background: linear-gradient(135deg, #7bc6ff 0%, #89dfd8 100%); border-radius: $fb-radius-card;
   padding: 26rpx 24rpx; display: flex; flex-direction: column; align-items: center;
   box-shadow: 0 14rpx 26rpx rgba(94, 192, 229, 0.2);
 }
@@ -125,10 +125,10 @@ export default {
 .nickname { margin-top: 14rpx; color: #fff; font-size: 34rpx; font-weight: 700; }
 .goal { margin-top: 6rpx; color: rgba(255,255,255,.95); font-size: 24rpx; }
 .panel {
-  margin-top: 12rpx; background: #fff; border: 1rpx solid #d8ebff; border-radius: 20rpx; padding: 20rpx;
-  box-shadow: 0 10rpx 22rpx rgba(66, 123, 180, 0.08);
+  margin-top: 12rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-card; padding: 20rpx;
+  box-shadow: $fb-shadow-card;
 }
-.panel-title { color: #3d5f90; font-size: 28rpx; font-weight: 700; display: block; }
+.panel-title { color: $fb-text-primary; font-size: 28rpx; font-weight: 700; display: block; }
 .heatmap-grid {
   margin-top: 12rpx;
   display: grid;
@@ -136,18 +136,18 @@ export default {
   gap: 6rpx;
 }
 .heat-cell { width: 100%; aspect-ratio: 1; border-radius: 6rpx; }
-.lv-0 { background: #edf4ff; }
-.lv-1 { background: #9ed8d0; }
-.lv-2 { background: #5ec9bd; }
-.lv-3 { background: #4fa6dc; }
-.lv-4 { background: #5f41f6; }
-.panel-item { color: #6e86aa; font-size: 24rpx; margin-top: 10rpx; display: block; }
+.lv-0 { background: $fb-heat-lv0; }
+.lv-1 { background: $fb-heat-lv1; }
+.lv-2 { background: $fb-heat-lv2; }
+.lv-3 { background: $fb-heat-lv3; }
+.lv-4 { background: $fb-heat-lv4; }
+.panel-item { color: $fb-text-secondary; font-size: 24rpx; margin-top: 10rpx; display: block; }
 .bottom-nav {
   position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx;
-  background: #fff; border: 1rpx solid #d8ebff; border-radius: 26rpx;
-  box-shadow: 0 10rpx 24rpx rgba(88, 139, 193, 0.15);
+  background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-nav;
+  box-shadow: $fb-shadow-nav;
   height: 94rpx; display: flex; align-items: center;
 }
-.nav-item { flex: 1; text-align: center; color: #7b95b9; font-size: 26rpx; }
-.nav-item.active { color: #5f41f6; font-weight: 700; }
+.nav-item { flex: 1; text-align: center; color: $fb-text-secondary; font-size: 26rpx; }
+.nav-item.active { color: $fb-text-accent; font-weight: 700; }
 </style>

@@ -4,6 +4,7 @@ import com.flashback.backend.auth.CurrentUserId;
 import com.flashback.backend.auth.JwtService;
 import com.flashback.backend.dto.ApiResponse;
 import com.flashback.backend.dto.request.CreateDeckRequest;
+import com.flashback.backend.dto.request.CsvImportRequest;
 import com.flashback.backend.dto.request.LoginRequest;
 import com.flashback.backend.dto.request.RenameDeckRequest;
 import com.flashback.backend.dto.request.ReviewCardRequest;
@@ -99,6 +100,9 @@ public class FlashBackController {
         Map<String, Object> payload = new HashMap<>();
         payload.put("front", request.front());
         payload.put("back", request.back());
+        payload.put("front_image_url", request.frontImageUrl());
+        payload.put("back_image_url", request.backImageUrl());
+        payload.put("audio_url", request.audioUrl());
         Map<String, Object> card = service.addCard(userId, deckId, payload);
         if (card == null) throw new BizException("卡片集不存在");
         return ApiResponse.ok(card);
@@ -112,6 +116,9 @@ public class FlashBackController {
         Map<String, Object> payload = new HashMap<>();
         payload.put("front", request.front());
         payload.put("back", request.back());
+        payload.put("front_image_url", request.frontImageUrl());
+        payload.put("back_image_url", request.backImageUrl());
+        payload.put("audio_url", request.audioUrl());
         boolean ok = service.updateCard(userId, deckId, cardId, payload, request.version());
         if (!ok) throw new BizException("知识点不存在");
         return ApiResponse.ok(new HashMap<>());
@@ -160,5 +167,11 @@ public class FlashBackController {
     public ApiResponse<List<Map<String, Object>>> heatmap(@CurrentUserId String userId,
                                                            @RequestParam(defaultValue = "120") int days) {
         return ApiResponse.ok(service.getHeatmap(userId, days));
+    }
+
+    @PostMapping("/import/csv")
+    public ApiResponse<Map<String, Object>> importCsv(@CurrentUserId String userId,
+                                                       @Valid @RequestBody CsvImportRequest request) {
+        return ApiResponse.ok(service.importCsv(userId, request.csvContent(), request.defaultDeckName()));
     }
 }

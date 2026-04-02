@@ -8,6 +8,9 @@ public record UpdateCardRequest(
         String front,
         @NotBlank(message = "答案不能为空")
         String back,
+        String frontImageUrl,
+        String backImageUrl,
+        String audioUrl,
         @Min(value = 0, message = "version 不能小于 0")
         long version
 ) {}

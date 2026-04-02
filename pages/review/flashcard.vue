@@ -26,11 +26,15 @@
         <view class="face front">
           <text class="face-label">问题</text>
           <text class="face-text">{{ currentCard.front_text || currentCard.front || '' }}</text>
+          <image v-if="currentCard.front_image_url" class="face-image" :src="currentCard.front_image_url" mode="widthFix" />
+          <view v-if="currentCard.audio_url" class="audio-btn" @tap.stop="playAudio(currentCard.audio_url)">▶ 播放音频</view>
           <text class="hint">点击翻转查看解析 / 左右滑动提交反馈</text>
         </view>
         <view class="face back">
           <text class="face-label">解析</text>
           <text class="face-text">{{ currentCard.back_text || currentCard.back || '' }}</text>
+          <image v-if="currentCard.back_image_url" class="face-image" :src="currentCard.back_image_url" mode="widthFix" />
+          <view v-if="currentCard.audio_url" class="audio-btn" @tap.stop="playAudio(currentCard.audio_url)">▶ 播放音频</view>
         </view>
       </view>
     </view>
@@ -205,6 +209,12 @@ export default {
       if (!this.currentCard || this.flyClass || this.cardMotionClass === 'card-enter') return;
       this.isFlipped = !this.isFlipped;
     },
+    playAudio(url) {
+      if (!url) return;
+      const audio = uni.createInnerAudioContext();
+      audio.src = url;
+      audio.play();
+    },
     async answer(type) {
       if (!this.currentCard || !this.isFlipped || this.flyClass || this.submitting) return;
       this.submitting = true;
@@ -313,6 +323,8 @@ export default {
 .back { transform: rotateY(180deg); }
 .face-label { color: $fb-text-secondary; font-size: 24rpx; }
 .face-text { margin-top: 24rpx; color: $fb-text-primary; font-size: 34rpx; font-weight: 650; line-height: 1.62; }
+.face-image { margin-top: 16rpx; width: 100%; border-radius: 14rpx; border: 1rpx solid $fb-border; }
+.audio-btn { margin-top: 12rpx; width: 220rpx; text-align: center; padding: 10rpx 14rpx; border-radius: 999rpx; background: #edf2ff; color: #365c95; font-size: 22rpx; }
 .hint { margin-top: auto; color: $fb-text-secondary; font-size: 24rpx; }
 .actions {
   display: grid;

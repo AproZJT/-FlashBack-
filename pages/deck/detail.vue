@@ -64,6 +64,8 @@
           <view class="face back">
             <text class="face-label">解析</text>
             <rich-text class="face-rich" :nodes="activeCardHtml"></rich-text>
+            <image v-if="activeCard.back_image_url" class="popup-image" :src="activeCard.back_image_url" mode="widthFix" />
+            <view v-if="activeCard.audio_url" class="popup-audio" @tap.stop="playAudio(activeCard.audio_url)">▶ 播放音频</view>
           </view>
         </view>
 
@@ -142,6 +144,12 @@ export default {
       this.activeCardHtml = renderMarkdownToHtml(card.back_text || '');
       this.popupVisible = true;
       this.popupFlipped = false;
+    },
+    playAudio(url) {
+      if (!url) return;
+      const audio = uni.createInnerAudioContext();
+      audio.src = url;
+      audio.play();
     },
     async togglePublic(event) {
       const value = !!(event && event.detail && event.detail.value);
@@ -224,21 +232,35 @@ export default {
             title: '填写解析',
             editable: true,
             placeholderText: '输入背面答案解析',
-            confirmText: '保存',
-            success: async ({ confirm: ok, content: answer }) => {
+            confirmText: '下一步',
+            success: ({ confirm: ok, content: answer }) => {
               if (!ok || this.submitting) return;
-              this.submitting = true;
-              const result = await addCard(this.deckId, { front, back: answer });
-              if (!result.ok) {
-                uni.showToast({ title: result.message, icon: 'none' });
-                this.submitting = false;
-                return;
-              }
-              await this.loadDeck();
-              uni.showToast({ title: '添加成功', icon: 'success' });
-              setTimeout(() => {
-                this.submitting = false;
-              }, 300);
+              uni.showModal({
+                title: '媒体 URL（可空）',
+                editable: true,
+                placeholderText: '格式：frontImg|backImg|audio',
+                confirmText: '保存',
+                success: async ({ confirm: yes, content: mediaRaw }) => {
+                  if (!yes || this.submitting) return;
+                  const parts = String(mediaRaw || '').split('|');
+                  const frontImageUrl = (parts[0] || '').trim();
+                  const backImageUrl = (parts[1] || '').trim();
+                  const audioUrl = (parts[2] || '').trim();
+
+                  this.submitting = true;
+                  const result = await addCard(this.deckId, { front, back: answer, frontImageUrl, backImageUrl, audioUrl });
+                  if (!result.ok) {
+                    uni.showToast({ title: result.message, icon: 'none' });
+                    this.submitting = false;
+                    return;
+                  }
+                  await this.loadDeck();
+                  uni.showToast({ title: '添加成功', icon: 'success' });
+                  setTimeout(() => {
+                    this.submitting = false;
+                  }, 300);
+                }
+              });
             }
           });
         }
@@ -295,21 +317,42 @@ export default {
             title: '编辑解析',
             editable: true,
             placeholderText: card.back_text,
-            confirmText: '保存',
-            success: async ({ confirm: ok, content: answer }) => {
+            confirmText: '下一步',
+            success: ({ confirm: ok, content: answer }) => {
               if (!ok || this.submitting) return;
-              this.submitting = true;
-              const result = await updateCard(this.deckId, card.id, { front, back: answer, version: Number(card.version || 0) });
-              if (!result.ok) {
-                uni.showToast({ title: result.message, icon: 'none' });
-                this.submitting = false;
-                return;
-              }
-              await this.loadDeck();
-              uni.showToast({ title: '已更新', icon: 'none' });
-              setTimeout(() => {
-                this.submitting = false;
-              }, 250);
+              uni.showModal({
+                title: '媒体 URL（可空）',
+                editable: true,
+                placeholderText: `${card.front_image_url || ''}|${card.back_image_url || ''}|${card.audio_url || ''}`,
+                confirmText: '保存',
+                success: async ({ confirm: yes, content: mediaRaw }) => {
+                  if (!yes || this.submitting) return;
+                  const parts = String(mediaRaw || '').split('|');
+                  const frontImageUrl = (parts[0] || '').trim();
+                  const backImageUrl = (parts[1] || '').trim();
+                  const audioUrl = (parts[2] || '').trim();
+
+                  this.submitting = true;
+                  const result = await updateCard(this.deckId, card.id, {
+                    front,
+                    back: answer,
+                    frontImageUrl,
+                    backImageUrl,
+                    audioUrl,
+                    version: Number(card.version || 0)
+                  });
+                  if (!result.ok) {
+                    uni.showToast({ title: result.message, icon: 'none' });
+                    this.submitting = false;
+                    return;
+                  }
+                  await this.loadDeck();
+                  uni.showToast({ title: '已更新', icon: 'none' });
+                  setTimeout(() => {
+                    this.submitting = false;
+                  }, 250);
+                }
+              });
             }
           });
         }
@@ -459,4 +502,6 @@ export default {
 .face-rich :deep(.md-n) { color: #fca5a5; }
 .face-rich :deep(.md-c) { color: #94a3b8; font-style: italic; }
 .face-rich :deep(.md-b) { color: #fcd34d; }
+.popup-image { margin-top: 14rpx; width: 100%; border-radius: 12rpx; border: 1rpx solid #d8ebff; }
+.popup-audio { margin-top: 12rpx; width: 220rpx; text-align: center; padding: 10rpx 14rpx; border-radius: 999rpx; background: #edf2ff; color: #365c95; font-size: 22rpx; }
 </style>

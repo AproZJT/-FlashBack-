@@ -174,6 +174,9 @@ public class FlashBackService {
         card.put("deck_id", deckId);
         card.put("front_text", String.valueOf(payload.getOrDefault("front", "")));
         card.put("back_text", String.valueOf(payload.getOrDefault("back", "")));
+        card.put("front_image_url", String.valueOf(payload.getOrDefault("front_image_url", "")));
+        card.put("back_image_url", String.valueOf(payload.getOrDefault("back_image_url", "")));
+        card.put("audio_url", String.valueOf(payload.getOrDefault("audio_url", "")));
         card.put("review_count", 0);
         card.put("mastery_level", 0);
         card.put("last_review_grade", -1);
@@ -203,6 +206,9 @@ public class FlashBackService {
 
         card.put("front_text", String.valueOf(payload.getOrDefault("front", card.getOrDefault("front_text", ""))));
         card.put("back_text", String.valueOf(payload.getOrDefault("back", card.getOrDefault("back_text", ""))));
+        card.put("front_image_url", String.valueOf(payload.getOrDefault("front_image_url", card.getOrDefault("front_image_url", ""))));
+        card.put("back_image_url", String.valueOf(payload.getOrDefault("back_image_url", card.getOrDefault("back_image_url", ""))));
+        card.put("audio_url", String.valueOf(payload.getOrDefault("audio_url", card.getOrDefault("audio_url", ""))));
         card.put("version", currentVersion + 1);
         redis.opsForValue().set(cardKey(cardId), toJson(card));
         return true;
@@ -376,6 +382,71 @@ public class FlashBackService {
         if (count != null) {
             redis.expire(heatCountHashKey(userId, yearMonth), 400, TimeUnit.DAYS);
         }
+    }
+
+    public Map<String, Object> importCsv(String userId, String csvContent, String defaultDeckName) {
+        String content = csvContent == null ? "" : csvContent.trim();
+        if (content.isEmpty()) throw new BizException("csvContent 不能为空");
+
+        List<String> lines = Arrays.stream(content.split("\\r?\\n"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        if (lines.size() <= 1) throw new BizException("CSV 至少包含表头和一行数据");
+
+        Map<String, String> deckMap = new HashMap<>();
+        String fallbackName = (defaultDeckName == null || defaultDeckName.isBlank()) ? "CSV导入" : defaultDeckName.trim();
+        Map<String, Object> fallbackDeck = createDeck(userId, fallbackName);
+        deckMap.put(fallbackName, String.valueOf(fallbackDeck.get("id")));
+
+        int success = 0;
+        int fail = 0;
+
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            String[] arr = line.split(",", -1);
+            if (arr.length < 2) {
+                fail++;
+                continue;
+            }
+
+            String front = arr[0].trim();
+            String back = arr[1].trim();
+            String deckName = arr.length > 2 ? arr[2].trim() : "";
+            String imageUrl = arr.length > 3 ? arr[3].trim() : "";
+            String audioUrl = arr.length > 4 ? arr[4].trim() : "";
+
+            if (front.isEmpty() || back.isEmpty()) {
+                fail++;
+                continue;
+            }
+
+            String finalDeckName = deckName.isEmpty() ? fallbackName : deckName;
+            String deckId = deckMap.get(finalDeckName);
+            if (deckId == null) {
+                Map<String, Object> deck = createDeck(userId, finalDeckName);
+                deckId = String.valueOf(deck.get("id"));
+                deckMap.put(finalDeckName, deckId);
+            }
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("front", front);
+            payload.put("back", back);
+            payload.put("front_image_url", imageUrl);
+            payload.put("back_image_url", imageUrl);
+            payload.put("audio_url", audioUrl);
+
+            Map<String, Object> added = addCard(userId, deckId, payload);
+            if (added == null) fail++;
+            else success++;
+        }
+
+        Map<String, Object> report = new HashMap<>();
+        report.put("success", success);
+        report.put("fail", fail);
+        report.put("total", success + fail);
+        report.put("deckCount", deckMap.size());
+        return report;
     }
 
     private void seedIfEmpty(String userId) {

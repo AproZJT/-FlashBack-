@@ -41,6 +41,13 @@
         "navigationStyle": "custom",
         "backgroundColor": "#F8FBFF"
       }
+    },
+    {
+      "path": "pages/pc/creator",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "#F8FBFF"
+      }
     }
   ],
   "globalStyle": {

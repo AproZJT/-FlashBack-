@@ -354,7 +354,14 @@ export async function clonePublicDeck(sourceDeckId) {
 
 export async function addCard(deckId, payload) {
   await ensureAuthed();
-  const res = await request(`/decks/${deckId}/cards`, 'POST', payload, { withLoading: true });
+  const req = {
+    front: payload.front,
+    back: payload.back,
+    frontImageUrl: payload.frontImageUrl || '',
+    backImageUrl: payload.backImageUrl || '',
+    audioUrl: payload.audioUrl || ''
+  };
+  const res = await request(`/decks/${deckId}/cards`, 'POST', req, { withLoading: true });
   if (!res.ok) return { ok: false, message: res.message };
   await getDecks();
   return { ok: true };
@@ -365,6 +372,9 @@ export async function updateCard(deckId, cardId, payload) {
   const req = {
     front: payload.front,
     back: payload.back,
+    frontImageUrl: payload.frontImageUrl || '',
+    backImageUrl: payload.backImageUrl || '',
+    audioUrl: payload.audioUrl || '',
     version: Number(payload.version || 0)
   };
 
@@ -423,6 +433,14 @@ export async function getStudyHeatmap(days = 120) {
   await ensureAuthed();
   const res = await request(`/study/heatmap?days=${days}`);
   return res.ok ? (res.data || []) : [];
+}
+
+export async function importCardsByCsv(csvContent, defaultDeckName = 'CSV导入') {
+  await ensureAuthed();
+  const res = await request('/import/csv', 'POST', { csvContent, defaultDeckName }, { withLoading: true });
+  if (!res.ok) return { ok: false, message: res.message };
+  await getDecks();
+  return { ok: true, report: res.data };
 }
 
 function getProgressMap() {

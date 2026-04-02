@@ -3,6 +3,7 @@
     <view class="top-nav">
       <text class="nav-title">FlashBack</text>
       <view class="nav-actions">
+        <view class="nav-action ghost" @tap="goPcCreator">PC制卡</view>
         <view class="nav-action ghost" @tap="goImport">导入</view>
         <view class="nav-action" @tap="openCreateDialog">+ 新建</view>
       </view>
@@ -156,6 +157,9 @@ export default {
     },
     goImport() {
       uni.navigateTo({ url: '/pages/import/csv' });
+    },
+    goPcCreator() {
+      uni.navigateTo({ url: '/pages/pc/creator' });
     }
   }
 };

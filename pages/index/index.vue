@@ -2,7 +2,10 @@
   <view class="page">
     <view class="top-nav">
       <text class="nav-title">FlashBack</text>
-      <view class="nav-action" @tap="openCreateDialog">+ 新建</view>
+      <view class="nav-actions">
+        <view class="nav-action ghost" @tap="goImport">导入</view>
+        <view class="nav-action" @tap="openCreateDialog">+ 新建</view>
+      </view>
     </view>
 
     <view class="profile-card" @tap="goUser">
@@ -18,6 +21,7 @@
       <text class="due-title">待复习卡片</text>
       <text class="due-value">{{ dueCount }} 张</text>
       <text class="due-tip">基于遗忘曲线调度（next_review_time）</text>
+      <text class="offline-tip" v-if="offlineMeta.pending > 0">离线队列：{{ offlineMeta.pending }} 条待同步（冲突 {{ offlineMeta.conflicts }}）</text>
     </view>
 
     <view class="filter-row" v-if="decks.length">
@@ -53,7 +57,7 @@
 </template>
 
 <script>
-import { getDecks, createDeck, renameDeck, getUserProfile, getDueReviewCards } from '@/utils/storage.js';
+import { getDecks, createDeck, renameDeck, getUserProfile, getDueReviewCards, getOfflineQueueMeta } from '@/utils/storage.js';
 
 function countDue(cards = [], now = Date.now()) {
   return (cards || []).filter(card => !card.next_review_time || Number(card.next_review_time) <= now).length;
@@ -67,7 +71,8 @@ export default {
       profile: { nickname: '', avatarText: '', goal: '' },
       dueCount: 0,
       onlyDue: false,
-      submitting: false
+      submitting: false,
+      offlineMeta: { pending: 0, conflicts: 0 }
     };
   },
   async onShow() {
@@ -75,6 +80,7 @@ export default {
     this.profile = await getUserProfile();
     const dueCards = await getDueReviewCards();
     this.dueCount = dueCards.length;
+    this.offlineMeta = getOfflineQueueMeta();
   },
   methods: {
     async loadDecks() {
@@ -147,6 +153,9 @@ export default {
     },
     goMarket() {
       uni.navigateTo({ url: '/pages/market/index' });
+    },
+    goImport() {
+      uni.navigateTo({ url: '/pages/import/csv' });
     }
   }
 };

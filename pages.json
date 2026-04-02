@@ -34,10 +34,17 @@
         "navigationStyle": "custom",
         "backgroundColor": "#0B1020"
       }
+    },
+    {
+      "path": "pages/import/csv",
+      "style": {
+        "navigationStyle": "custom",
+        "backgroundColor": "#F8FBFF"
+      }
     }
   ],
   "globalStyle": {
     "navigationStyle": "custom",
-    "backgroundColor": "#0B1020"
+    "backgroundColor": "#F8FBFF"
   }
 }

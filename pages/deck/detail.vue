@@ -181,7 +181,7 @@ export default {
         return;
       }
       this.submitting = true;
-      const result = await reviewCard(this.deckId, this.activeCard.id, type);
+      const result = await reviewCard(this.deckId, this.activeCard.id, type, Number(this.activeCard.version || 0));
       if (!result.ok) {
         uni.showToast({ title: result.message, icon: 'none' });
         this.submitting = false;
@@ -299,7 +299,7 @@ export default {
             success: async ({ confirm: ok, content: answer }) => {
               if (!ok || this.submitting) return;
               this.submitting = true;
-              const result = await updateCard(this.deckId, card.id, { front, back: answer });
+              const result = await updateCard(this.deckId, card.id, { front, back: answer, version: Number(card.version || 0) });
               if (!result.ok) {
                 uni.showToast({ title: result.message, icon: 'none' });
                 this.submitting = false;

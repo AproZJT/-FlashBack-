@@ -1,5 +1,9 @@
-const API_BASE = 'http://127.0.0.1:8080/api';
-const USER_ID = 'local_user_001';
+const API_BASE = (typeof process !== 'undefined' && process.env && process.env.VUE_APP_API_BASE)
+  ? process.env.VUE_APP_API_BASE
+  : 'http://127.0.0.1:8080/api';
+const USER_ID = (typeof process !== 'undefined' && process.env && process.env.VUE_APP_USER_ID)
+  ? process.env.VUE_APP_USER_ID
+  : 'local_user_001';
 const REVIEW_PROGRESS_KEY = 'flashback_review_progress_v1';
 
 function request(url, method = 'GET', data) {
@@ -66,8 +70,8 @@ export async function toggleDeckPublic(deckId, value) {
   return { ok: true };
 }
 
-export async function getPublicDecks() {
-  const res = await request('/market/decks');
+export async function getPublicDecks(page = 1, pageSize = 20) {
+  const res = await request(`/market/decks?page=${page}&pageSize=${pageSize}`);
   return res.ok ? (res.data || []) : [];
 }
 

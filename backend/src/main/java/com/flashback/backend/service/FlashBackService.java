@@ -29,6 +29,7 @@ public class FlashBackService {
     private String cardKey(String cardId) { return "fb:card:" + cardId; }
     private String reviewZsetKey(String userId) { return "fb:review:zset:" + userId; }
     private String heatBitmapKey(String userId, int year) { return "fb:study:bitmap:" + userId + ":" + year; }
+    private String marketDeckZsetKey() { return "fb:market:decks"; }
 
     private String toJson(Object value) {
         try { return objectMapper.writeValueAsString(value); }
@@ -43,14 +44,20 @@ public class FlashBackService {
 
     private List<Map<String, Object>> cardsByDeck(String deckId) {
         Set<String> cardIds = redis.opsForSet().members(deckCardSetKey(deckId));
-        List<Map<String, Object>> cards = new ArrayList<>();
-        if (cardIds == null) return cards;
-        for (String id : cardIds) {
-            String raw = redis.opsForValue().get(cardKey(id));
-            if (raw != null) cards.add(fromJsonMap(raw));
-        }
-        cards.sort(Comparator.comparingLong(c -> ((Number)c.getOrDefault("created_at", 0)).longValue()));
-        return cards;
+        if (cardIds == null || cardIds.isEmpty()) return new ArrayList<>();
+
+        List<String> keys = cardIds.stream().map(this::cardKey).toList();
+        List<String> raws = redis.opsForValue().multiGet(keys);
+        if (raws == null || raws.isEmpty()) return new ArrayList<>();
+
+        List<Map<String, Object>> cards = raws.stream()
+                .filter(Objects::nonNull)
+                .map(this::fromJsonMap)
+                .filter(map -> !map.isEmpty())
+                .sorted(Comparator.comparingLong(c -> ((Number) c.getOrDefault("created_at", 0)).longValue()))
+                .toList();
+
+        return new ArrayList<>(cards);
     }
 
     public Map<String, Object> ensureUser(String userId) {
@@ -96,13 +103,14 @@ public class FlashBackService {
     }
 
     public Map<String, Object> createDeck(String userId, String name) {
-        String deckId = "deck_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 6);
+        long createdAt = System.currentTimeMillis();
+        String deckId = "deck_" + createdAt + "_" + UUID.randomUUID().toString().substring(0, 6);
         Map<String, Object> deck = new HashMap<>();
         deck.put("id", deckId);
         deck.put("user_id", userId);
         deck.put("name", name);
         deck.put("is_public", false);
-        deck.put("createdAt", System.currentTimeMillis());
+        deck.put("createdAt", createdAt);
         redis.opsForValue().set(deckKey(deckId), toJson(deck));
         redis.opsForSet().add(userDeckSetKey(userId), deckId);
         return deck;
@@ -132,6 +140,12 @@ public class FlashBackService {
         deck.put("is_public", value);
         deck.remove("cards");
         redis.opsForValue().set(deckKey(deckId), toJson(deck));
+        if (value) {
+            long score = ((Number) deck.getOrDefault("createdAt", System.currentTimeMillis())).longValue();
+            redis.opsForZSet().add(marketDeckZsetKey(), deckId, score);
+        } else {
+            redis.opsForZSet().remove(marketDeckZsetKey(), deckId);
+        }
         return true;
     }
 
@@ -217,14 +231,26 @@ public class FlashBackService {
         return list;
     }
 
-    public List<Map<String, Object>> getPublicDecks(String userId) {
-        Set<String> keys = redis.keys("fb:deck:*");
-        if (keys == null) return List.of();
+    public List<Map<String, Object>> getPublicDecks(String userId, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.min(Math.max(1, pageSize), 50);
+        long start = (long) (safePage - 1) * safePageSize;
+        long end = start + safePageSize - 1;
+
+        Set<String> deckIds = redis.opsForZSet().reverseRange(marketDeckZsetKey(), start, end);
+        if (deckIds == null || deckIds.isEmpty()) return List.of();
+
         List<Map<String, Object>> list = new ArrayList<>();
-        for (String key : keys) {
-            Map<String, Object> deck = fromJsonMap(redis.opsForValue().get(key));
-            if (!Boolean.TRUE.equals(deck.get("is_public"))) continue;
-            String deckId = String.valueOf(deck.get("id"));
+        for (String deckId : deckIds) {
+            Map<String, Object> deck = fromJsonMap(redis.opsForValue().get(deckKey(deckId)));
+            if (deck.isEmpty()) {
+                redis.opsForZSet().remove(marketDeckZsetKey(), deckId);
+                continue;
+            }
+            if (!Boolean.TRUE.equals(deck.get("is_public"))) {
+                redis.opsForZSet().remove(marketDeckZsetKey(), deckId);
+                continue;
+            }
             Map<String, Object> item = new HashMap<>();
             item.put("id", deckId);
             item.put("name", deck.get("name"));

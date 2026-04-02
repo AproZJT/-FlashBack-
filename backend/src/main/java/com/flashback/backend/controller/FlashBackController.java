@@ -126,8 +126,10 @@ public class FlashBackController {
     }
 
     @GetMapping("/market/decks")
-    public ApiResponse<List<Map<String, Object>>> market(@RequestParam(defaultValue = "local_user_001") String userId) {
-        return ApiResponse.ok(service.getPublicDecks(userId));
+    public ApiResponse<List<Map<String, Object>>> market(@RequestParam(defaultValue = "local_user_001") String userId,
+                                                          @RequestParam(defaultValue = "1") int page,
+                                                          @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.ok(service.getPublicDecks(userId, page, pageSize));
     }
 
     @PostMapping("/market/decks/{deckId}/clone")

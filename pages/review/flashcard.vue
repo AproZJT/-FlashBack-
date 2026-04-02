@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" @touchstart="onEdgeSwipeStart" @touchmove="onEdgeSwipeMove" @touchend="onEdgeSwipeEnd">
     <view class="top-nav">
       <view class="nav-left" @tap="goBack">‹ 返回</view>
       <view class="nav-title">闪回复习</view>
@@ -46,6 +46,7 @@
 
     <view class="bottom-nav">
       <view class="nav-item active" @tap="goHome">卡片</view>
+      <view class="nav-item" @tap="goMarket">集市</view>
       <view class="nav-item" @tap="goUser">用户</view>
     </view>
   </view>
@@ -73,6 +74,12 @@ export default {
       stats: {
         master: 0,
         blur: 0
+      },
+      edgeSwipe: {
+        tracking: false,
+        startX: 0,
+        startY: 0,
+        shouldHandle: false
       }
     };
   },
@@ -99,11 +106,38 @@ export default {
     this.persistProgress();
   },
   methods: {
+    onEdgeSwipeStart(event) {
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      const { clientX, clientY } = touch;
+      this.edgeSwipe.tracking = true;
+      this.edgeSwipe.startX = clientX;
+      this.edgeSwipe.startY = clientY;
+      this.edgeSwipe.shouldHandle = clientX <= 28;
+    },
+    onEdgeSwipeMove(event) {
+      if (!this.edgeSwipe.tracking || !this.edgeSwipe.shouldHandle) return;
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      const deltaX = touch.clientX - this.edgeSwipe.startX;
+      const deltaY = Math.abs(touch.clientY - this.edgeSwipe.startY);
+      if (deltaX > 22 && deltaY < 42) {
+        this.edgeSwipe.shouldHandle = false;
+        this.goBack();
+      }
+    },
+    onEdgeSwipeEnd() {
+      this.edgeSwipe.tracking = false;
+      this.edgeSwipe.shouldHandle = false;
+    },
     goBack() {
       uni.navigateBack();
     },
     goHome() {
       uni.reLaunch({ url: '/pages/index/index' });
+    },
+    goMarket() {
+      uni.reLaunch({ url: '/pages/market/index' });
     },
     goUser() {
       uni.reLaunch({ url: '/pages/user/profile' });

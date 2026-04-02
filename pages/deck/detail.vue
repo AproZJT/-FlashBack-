@@ -1,9 +1,14 @@
 <template>
-  <view class="page">
+  <view class="page" @touchstart="onEdgeSwipeStart" @touchmove="onEdgeSwipeMove" @touchend="onEdgeSwipeEnd">
     <view class="top-nav">
       <view class="nav-left" @tap="goHome">‹ 首页</view>
       <view class="nav-title">{{ deck.name || '卡片管理' }}</view>
       <view class="nav-right" @tap="createCard">+ 新建</view>
+    </view>
+
+    <view class="publish-row">
+      <text class="publish-title">发布到集市</text>
+      <switch class="publish-switch" color="#22c55e" :checked="!!deck.is_public" @change="togglePublic" />
     </view>
 
     <scroll-view class="list-wrap" scroll-y>
@@ -19,6 +24,7 @@
           <view class="delete-action" @tap="confirmDelete(card.id)">删除</view>
           <view
             class="card-item"
+            hover-class="none"
             :style="{ transform: `translateX(${swipeOffsetMap[card.id] || 0}rpx)` }"
             @tap="openReviewPopup(card)"
             @longpress="openEditCard(card)"
@@ -43,6 +49,7 @@
 
     <view class="bottom-nav">
       <view class="nav-item active" @tap="goHome">卡片</view>
+      <view class="nav-item" @tap="goMarket">集市</view>
       <view class="nav-item" @tap="goUser">用户</view>
     </view>
 
@@ -56,7 +63,7 @@
           </view>
           <view class="face back">
             <text class="face-label">解析</text>
-            <text class="face-text">{{ activeCard.back_text }}</text>
+            <rich-text class="face-rich" :nodes="activeCardHtml"></rich-text>
           </view>
         </view>
 
@@ -71,7 +78,8 @@
 </template>
 
 <script>
-import { getDeckById, addCard, updateCard, deleteCard, reviewCard } from '@/utils/storage.js';
+import { getDeckById, addCard, updateCard, deleteCard, reviewCard, toggleDeckPublic } from '@/utils/storage.js';
+import { renderMarkdownToHtml } from '@/utils/markdown.js';
 
 const MAX_LEFT = -164;
 
@@ -87,20 +95,27 @@ export default {
       popupVisible: false,
       popupFlipped: false,
       activeCard: {},
+      activeCardHtml: '',
       reviewQueue: [],
-      reviewQueueIndex: -1
+      reviewQueueIndex: -1,
+      edgeSwipe: {
+        tracking: false,
+        startX: 0,
+        startY: 0,
+        shouldHandle: false
+      }
     };
   },
-  onLoad(query) {
+  async onLoad(query) {
     this.deckId = query.deckId || '';
-    this.loadDeck();
+    await this.loadDeck();
   },
-  onShow() {
-    this.loadDeck();
+  async onShow() {
+    await this.loadDeck();
   },
   methods: {
-    loadDeck() {
-      const target = getDeckById(this.deckId);
+    async loadDeck() {
+      const target = await getDeckById(this.deckId);
       if (!target) {
         uni.showToast({ title: '卡片集不存在', icon: 'none' });
         setTimeout(() => this.goHome(), 500);
@@ -124,8 +139,20 @@ export default {
     },
     openReviewPopup(card) {
       this.activeCard = card;
+      this.activeCardHtml = renderMarkdownToHtml(card.back_text || '');
       this.popupVisible = true;
       this.popupFlipped = false;
+    },
+    async togglePublic(event) {
+      const value = !!(event && event.detail && event.detail.value);
+      const res = await toggleDeckPublic(this.deckId, value);
+      if (!res.ok) {
+        uni.showToast({ title: res.message, icon: 'none' });
+        await this.loadDeck();
+        return;
+      }
+      this.deck.is_public = value;
+      uni.showToast({ title: value ? '已发布到集市' : '已取消发布', icon: 'none' });
     },
     startReviewFromFirstUnlearned() {
       if (!this.cards.length) return;
@@ -147,20 +174,20 @@ export default {
       this.reviewQueue = [];
       this.reviewQueueIndex = -1;
     },
-    submitFeedback(type) {
+    async submitFeedback(type) {
       if (this.submitting || !this.activeCard.id) return;
       if (!this.popupFlipped) {
         uni.showToast({ title: '请先翻转查看答案', icon: 'none' });
         return;
       }
       this.submitting = true;
-      const result = reviewCard(this.deckId, this.activeCard.id, type);
+      const result = await reviewCard(this.deckId, this.activeCard.id, type);
       if (!result.ok) {
         uni.showToast({ title: result.message, icon: 'none' });
         this.submitting = false;
         return;
       }
-      this.loadDeck();
+      await this.loadDeck();
 
       if (this.reviewQueue.length && this.reviewQueueIndex >= 0) {
         this.reviewQueueIndex += 1;
@@ -168,6 +195,7 @@ export default {
           const next = this.reviewQueue[this.reviewQueueIndex];
           setTimeout(() => {
             this.activeCard = next;
+            this.activeCardHtml = renderMarkdownToHtml(next.back_text || '');
             this.popupFlipped = false;
             this.submitting = false;
           }, 200);
@@ -197,16 +225,16 @@ export default {
             editable: true,
             placeholderText: '输入背面答案解析',
             confirmText: '保存',
-            success: ({ confirm: ok, content: answer }) => {
+            success: async ({ confirm: ok, content: answer }) => {
               if (!ok || this.submitting) return;
               this.submitting = true;
-              const result = addCard(this.deckId, { front, back: answer });
+              const result = await addCard(this.deckId, { front, back: answer });
               if (!result.ok) {
                 uni.showToast({ title: result.message, icon: 'none' });
                 this.submitting = false;
                 return;
               }
-              this.loadDeck();
+              await this.loadDeck();
               uni.showToast({ title: '添加成功', icon: 'success' });
               setTimeout(() => {
                 this.submitting = false;
@@ -236,16 +264,16 @@ export default {
       uni.showModal({
         title: '确认删除',
         content: '删除后无法恢复',
-        success: ({ confirm }) => {
+        success: async ({ confirm }) => {
           if (!confirm || this.submitting) return;
           this.submitting = true;
-          const result = deleteCard(this.deckId, cardId);
+          const result = await deleteCard(this.deckId, cardId);
           if (!result.ok) {
             uni.showToast({ title: result.message, icon: 'none' });
             this.submitting = false;
             return;
           }
-          this.loadDeck();
+          await this.loadDeck();
           uni.showToast({ title: '已删除', icon: 'none' });
           setTimeout(() => {
             this.submitting = false;
@@ -268,16 +296,16 @@ export default {
             editable: true,
             placeholderText: card.back_text,
             confirmText: '保存',
-            success: ({ confirm: ok, content: answer }) => {
+            success: async ({ confirm: ok, content: answer }) => {
               if (!ok || this.submitting) return;
               this.submitting = true;
-              const result = updateCard(this.deckId, card.id, { front, back: answer });
+              const result = await updateCard(this.deckId, card.id, { front, back: answer });
               if (!result.ok) {
                 uni.showToast({ title: result.message, icon: 'none' });
                 this.submitting = false;
                 return;
               }
-              this.loadDeck();
+              await this.loadDeck();
               uni.showToast({ title: '已更新', icon: 'none' });
               setTimeout(() => {
                 this.submitting = false;
@@ -287,8 +315,36 @@ export default {
         }
       });
     },
+    onEdgeSwipeStart(event) {
+      if (this.popupVisible) return;
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      const { clientX, clientY } = touch;
+      this.edgeSwipe.tracking = true;
+      this.edgeSwipe.startX = clientX;
+      this.edgeSwipe.startY = clientY;
+      this.edgeSwipe.shouldHandle = clientX <= 28;
+    },
+    onEdgeSwipeMove(event) {
+      if (!this.edgeSwipe.tracking || !this.edgeSwipe.shouldHandle) return;
+      const touch = event.touches && event.touches[0];
+      if (!touch) return;
+      const deltaX = touch.clientX - this.edgeSwipe.startX;
+      const deltaY = Math.abs(touch.clientY - this.edgeSwipe.startY);
+      if (deltaX > 22 && deltaY < 42) {
+        this.edgeSwipe.shouldHandle = false;
+        this.goHome();
+      }
+    },
+    onEdgeSwipeEnd() {
+      this.edgeSwipe.tracking = false;
+      this.edgeSwipe.shouldHandle = false;
+    },
     goHome() {
       uni.reLaunch({ url: '/pages/index/index' });
+    },
+    goMarket() {
+      uni.reLaunch({ url: '/pages/market/index' });
     },
     goUser() {
       uni.reLaunch({ url: '/pages/user/profile' });
@@ -298,36 +354,49 @@ export default {
 </script>
 
 <style lang="scss">
-.page { min-height: 100vh; background: #0b1020; padding: 24rpx 24rpx 128rpx; box-sizing: border-box; }
-.top-nav { height: 86rpx; border-radius: 20rpx; background: #121a2f; border: 1rpx solid #1f2a44; display: flex; align-items: center; justify-content: space-between; padding: 0 22rpx; }
-.nav-left,.nav-right { color: #7ee0b5; font-size: 25rpx; }
-.nav-title { color: #e5edff; font-size: 28rpx; font-weight: 600; max-width: 360rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.list-wrap { margin-top: 18rpx; max-height: calc(100vh - 240rpx); }
-.list-inner { display: flex; flex-direction: column; gap: 14rpx; }
+.page { min-height: 100vh; background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 60%, #edf9f7 100%); padding: 24rpx 24rpx 128rpx; box-sizing: border-box; }
+.top-nav { height: 86rpx; border-radius: 20rpx; background: #ffffff; border: 1rpx solid #d8ebff; display: flex; align-items: center; justify-content: space-between; padding: 0 22rpx; }
+.nav-left,.nav-right { color: #6b4dfb; font-size: 25rpx; font-weight: 600; }
+.nav-title { color: #2362b2; font-size: 28rpx; font-weight: 700; max-width: 360rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.publish-row {
+  margin-top: 14rpx;
+  border: 1rpx solid #d8ebff;
+  border-radius: 18rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 18rpx rgba(84, 136, 194, 0.08);
+  padding: 16rpx 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.publish-title { color: #4d6d9b; font-size: 25rpx; }
+.publish-switch { transform: scale(0.9); transform-origin: right center; }
+.list-wrap { margin-top: 14rpx; max-height: calc(100vh - 300rpx); }
+.list-inner { display: flex; flex-direction: column; gap: 10rpx; }
 .swipe-row { position: relative; overflow: hidden; border-radius: 18rpx; }
 .delete-action { position: absolute; right: 0; top: 0; width: 164rpx; height: 100%; background: linear-gradient(180deg, #ef5d6a, #d93f4e); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 28rpx; }
-.card-item { position: relative; z-index: 2; background: #121a2f; border: 1rpx solid #1f2a44; border-radius: 18rpx; padding: 22rpx; transition: transform .18s ease; }
+.card-item { position: relative; z-index: 2; background: #ffffff; border: 1rpx solid #d8ebff; border-radius: 18rpx; padding: 20rpx; box-shadow: 0 8rpx 18rpx rgba(84, 136, 194, 0.08); transition: transform .18s ease; }
 .card-row { display: flex; gap: 12rpx; align-items: center; }
-.card-front { flex: 1; color: #e7eeff; font-size: 28rpx; line-height: 1.55; }
+.card-front { flex: 1; color: #244f88; font-size: 28rpx; line-height: 1.55; }
 .status-tag { padding: 8rpx 14rpx; border-radius: 14rpx; font-size: 20rpx; }
-.s-master { background: rgba(34,197,94,.18); color: #86efac; }
-.s-blur { background: rgba(245,158,11,.18); color: #fcd34d; }
-.s-forget { background: rgba(248,113,113,.18); color: #fca5a5; }
-.s-none { background: rgba(148,163,184,.18); color: #cbd5e1; }
-.card-tip { display: block; margin-top: 10rpx; color: #8ca0c7; font-size: 22rpx; }
-.empty-wrap { margin-top: 260rpx; text-align: center; }
-.empty-title { color: #d3dcf3; font-size: 32rpx; }
-.empty-tip { color: #8ca0c7; font-size: 23rpx; margin-top: 8rpx; display: block; }
+.s-master { background: #def9ec; color: #178a57; }
+.s-blur { background: #fff1db; color: #b7791f; }
+.s-forget { background: #ffe3e5; color: #b6404a; }
+.s-none { background: #edf2ff; color: #6a7ea7; }
+.card-tip { display: block; margin-top: 8rpx; color: #6f88ae; font-size: 22rpx; }
+.empty-wrap { margin-top: 220rpx; text-align: center; }
+.empty-title { color: #5376a8; font-size: 32rpx; }
+.empty-tip { color: #86a2c7; font-size: 23rpx; margin-top: 8rpx; display: block; }
 .bottom-main { position: fixed; left: 0; right: 0; bottom: 126rpx; display: flex; justify-content: center; }
 .start-btn {
   width: 86%; height: 88rpx; line-height: 88rpx; border-radius: 44rpx;
-  background: linear-gradient(180deg, #2bb070 0%, #1f7a53 100%);
-  color: #fff; font-size: 30rpx; font-weight: 600;
+  background: linear-gradient(180deg, #35c58e 0%, #239666 100%);
+  color: #fff; font-size: 30rpx; font-weight: 700;
 }
-.start-btn[disabled] { background: #475569; color: #9fb0d4; }
-.bottom-nav { position: fixed; left: 24rpx; right: 24rpx; bottom: 26rpx; background: #121a2f; border: 1rpx solid #1f2a44; border-radius: 20rpx; height: 88rpx; display: flex; align-items: center; }
-.nav-item { flex: 1; text-align: center; color: #8ca0c7; font-size: 26rpx; }
-.nav-item.active { color: #7ee0b5; font-weight: 600; }
+.start-btn[disabled] { background: #b9c9e4; color: #f8fbff; }
+.bottom-nav { position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx; background: #ffffff; border: 1rpx solid #d8ebff; border-radius: 26rpx; box-shadow: 0 10rpx 24rpx rgba(88, 139, 193, 0.15); height: 94rpx; display: flex; align-items: center; }
+.nav-item { flex: 1; text-align: center; color: #7b95b9; font-size: 26rpx; }
+.nav-item.active { color: #5f41f6; font-weight: 700; }
 .mask { position: fixed; inset: 0; background: rgba(8,12,24,.68); display: flex; align-items: center; justify-content: center; z-index: 30; padding: 30rpx; box-sizing: border-box; }
 .popup-wrap { width: 100%; }
 .flash-card { width: 100%; height: 56vh; position: relative; transform-style: preserve-3d; transition: transform .52s cubic-bezier(.2,.75,.2,1.04); }
@@ -343,4 +412,51 @@ export default {
 .feedback-btn.forget { background: #ef4444; }
 .feedback-btn.blur { background: #f59e0b; }
 .feedback-btn.master { background: #16a34a; }
+.face-rich {
+  margin-top: 16rpx;
+  color: #1f2937;
+  font-size: 26rpx;
+  line-height: 1.7;
+}
+.face-rich :deep(h1),
+.face-rich :deep(h2),
+.face-rich :deep(h3) {
+  margin: 10rpx 0;
+  color: #111827;
+  font-weight: 700;
+}
+.face-rich :deep(strong) { font-weight: 700; }
+.face-rich :deep(.md-inline-code) {
+  padding: 2rpx 8rpx;
+  border-radius: 8rpx;
+  background: #f3f4f6;
+  color: #b91c1c;
+  font-size: 24rpx;
+}
+.face-rich :deep(.md-code) {
+  margin: 14rpx 0;
+  border-radius: 14rpx;
+  background: #0f172a;
+  overflow: hidden;
+}
+.face-rich :deep(.md-code-lang) {
+  padding: 8rpx 14rpx;
+  font-size: 20rpx;
+  color: #cbd5e1;
+  background: #1e293b;
+  text-transform: lowercase;
+}
+.face-rich :deep(.md-code code) {
+  display: block;
+  padding: 14rpx;
+  color: #e2e8f0;
+  font-size: 22rpx;
+  line-height: 1.65;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+.face-rich :deep(.md-k) { color: #93c5fd; }
+.face-rich :deep(.md-s) { color: #86efac; }
+.face-rich :deep(.md-n) { color: #fca5a5; }
+.face-rich :deep(.md-c) { color: #94a3b8; font-style: italic; }
+.face-rich :deep(.md-b) { color: #fcd34d; }
 </style>

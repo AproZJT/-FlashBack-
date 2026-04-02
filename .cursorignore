@@ -1,0 +1,28 @@
+# ~/.cursorignore
+# 这些规则会应用到所有 Cursor 项目
+
+# 常见虚拟环境
+.venv/
+venv/
+env/
+.virtualenv/
+
+# 依赖目录
+node_modules/
+vendor/
+
+# Python 缓存
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 敏感文件
+.env
+.env.*
+*.key
+secrets/
+
+# 日志与临时文件
+*.log
+*.tmp
+.DS_Store

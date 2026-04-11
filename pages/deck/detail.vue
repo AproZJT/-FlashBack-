@@ -58,7 +58,7 @@
         <view class="flash-card" :class="{ flipped: popupFlipped }" @tap="popupFlip">
           <view class="face front">
             <text class="face-label">问题</text>
-            <text class="face-text">{{ activeCard.front_text }}</text>
+            <text class="face-text">{{ formatIndentedText(activeCard.front_text) }}</text>
             <text class="face-tip">点击翻转查看答案</text>
           </view>
           <view class="face back">
@@ -138,6 +138,13 @@ export default {
       if (level === 2) return 's-blur';
       if (level === 1) return 's-forget';
       return 's-none';
+    },
+    formatIndentedText(raw) {
+      const text = String(raw || '');
+      return text
+        .split('\n')
+        .map(line => line.trim() ? `　　${line}` : '')
+        .join('\n');
     },
     openReviewPopup(card) {
       this.activeCard = card;
@@ -414,8 +421,8 @@ export default {
 }
 .publish-title { color: #4d6d9b; font-size: 25rpx; }
 .publish-switch { transform: scale(0.9); transform-origin: right center; }
-.list-wrap { margin-top: 14rpx; max-height: calc(100vh - 300rpx); }
-.list-inner { display: flex; flex-direction: column; gap: 10rpx; }
+.list-wrap { margin-top: 14rpx; max-height: calc(100vh - 360rpx); }
+.list-inner { display: flex; flex-direction: column; gap: 10rpx; padding-bottom: 220rpx; box-sizing: border-box; }
 .swipe-row { position: relative; overflow: hidden; border-radius: 18rpx; }
 .delete-action { position: absolute; right: 0; top: 0; width: 164rpx; height: 100%; background: linear-gradient(180deg, #ef5d6a, #d93f4e); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 28rpx; }
 .card-item { position: relative; z-index: 2; background: #ffffff; border: 1rpx solid #d8ebff; border-radius: 18rpx; padding: 20rpx; box-shadow: 0 8rpx 18rpx rgba(84, 136, 194, 0.08); transition: transform .18s ease; }
@@ -430,7 +437,7 @@ export default {
 .empty-wrap { margin-top: 220rpx; text-align: center; }
 .empty-title { color: #5376a8; font-size: 32rpx; }
 .empty-tip { color: #86a2c7; font-size: 23rpx; margin-top: 8rpx; display: block; }
-.bottom-main { position: fixed; left: 0; right: 0; bottom: 126rpx; display: flex; justify-content: center; }
+.bottom-main { position: fixed; left: 0; right: 0; bottom: 160rpx; display: flex; justify-content: center; z-index: 25; }
 .start-btn {
   width: 86%; height: 88rpx; line-height: 88rpx; border-radius: 44rpx;
   background: linear-gradient(180deg, #35c58e 0%, #239666 100%);
@@ -447,7 +454,18 @@ export default {
 .face { position: absolute; inset: 0; background: #fff; border-radius: 28rpx; box-shadow: 0 26rpx 46rpx rgba(0,0,0,.35); backface-visibility: hidden; -webkit-backface-visibility: hidden; padding: 40rpx 34rpx; box-sizing: border-box; display: flex; flex-direction: column; }
 .face.back { transform: rotateY(180deg); }
 .face-label { color: #6b7280; font-size: 24rpx; }
-.face-text { margin-top: 20rpx; color: #111827; font-size: 34rpx; font-weight: 600; line-height: 1.6; }
+.face-text {
+  margin-top: 20rpx;
+  color: #111827;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  width: 100%;
+  max-width: 88%;
+  align-self: center;
+  text-align: left;
+}
 .face-tip { margin-top: auto; color: #9ca3af; font-size: 24rpx; }
 .popup-actions { margin-top: 24rpx; display: flex; gap: 14rpx; opacity: 0; transform: translateY(18rpx); pointer-events: none; transition: all .24s ease; }
 .popup-actions.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
@@ -496,6 +514,9 @@ export default {
   font-size: 22rpx;
   line-height: 1.65;
   font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .face-rich :deep(.md-k) { color: #93c5fd; }
 .face-rich :deep(.md-s) { color: #86efac; }

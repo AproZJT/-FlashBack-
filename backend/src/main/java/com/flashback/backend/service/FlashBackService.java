@@ -455,6 +455,11 @@ public class FlashBackService {
 
         Map<String, Object> mediaDeck = createDeck(userId, "Phase4-富媒体演示");
         String mediaDeckId = String.valueOf(mediaDeck.get("id"));
+        toggleDeckPublic(userId, mediaDeckId, true);
+
+        Map<String, Object> marketDeck = createDeck(userId, "公开卡组-系统设计高频");
+        String marketDeckId = String.valueOf(marketDeck.get("id"));
+        toggleDeckPublic(userId, marketDeckId, true);
 
         for (int i = 1; i <= 18; i++) {
             Map<String, Object> payload = new HashMap<>();
@@ -476,6 +481,16 @@ public class FlashBackService {
             };
             reviewCard(userId, mediaDeckId, cardId, fb, 0);
             redis.opsForZSet().add(reviewZsetKey(userId), cardId, now - (i * HOUR));
+        }
+
+        for (int i = 1; i <= 12; i++) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("front", "系统设计题 " + i + "：请给出核心设计权衡");
+            payload.put("back", "从一致性、可用性、扩展性三个维度回答，并给出容量估算。\n\n```text\nQPS -> 存储 -> 缓存 -> 分片\n``` ");
+            Map<String, Object> card = addCard(userId, marketDeckId, payload);
+            if (card == null) continue;
+            String cardId = String.valueOf(card.get("id"));
+            redis.opsForZSet().add(reviewZsetKey(userId), cardId, now + (i * HOUR));
         }
 
         int[] counts = new int[] {0, 3, 10, 22, 40};

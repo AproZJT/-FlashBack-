@@ -344,6 +344,14 @@ export async function getPublicDecks(page = 1, pageSize = 20) {
   return res.ok ? (res.data || []) : [];
 }
 
+export async function seedDemoData() {
+  await ensureAuthed();
+  const res = await request('/dev/seed-demo', 'POST', {}, { withLoading: true });
+  if (!res.ok) return { ok: false, message: res.message };
+  await getDecks();
+  return { ok: true, data: res.data };
+}
+
 export async function clonePublicDeck(sourceDeckId) {
   await ensureAuthed();
   const res = await request(`/market/decks/${sourceDeckId}/clone`, 'POST', {}, { withLoading: true });

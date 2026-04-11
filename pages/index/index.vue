@@ -19,11 +19,24 @@
       <text class="arrow">›</text>
     </view>
 
-    <view class="due-card" @tap="goMarket">
-      <text class="due-title">待复习卡片</text>
-      <text class="due-value">{{ dueCount }} 张</text>
-      <text class="due-tip">基于遗忘曲线调度（next_review_time）</text>
+    <view class="metric-card" @tap="goMarket">
+      <text class="metric-title">今日待复习</text>
+      <text class="metric-value">{{ dueCount }}</text>
+      <text class="metric-tip">基于遗忘曲线调度（next_review_time）</text>
       <text class="offline-tip" v-if="offlineMeta.pending > 0">离线队列：{{ offlineMeta.pending }} 条待同步（冲突 {{ offlineMeta.conflicts }}）</text>
+    </view>
+
+    <view class="metric-card heat-card" @tap="goUser">
+      <text class="metric-title">学习热力图（近30天）</text>
+      <view class="heatmap-row">
+        <view
+          v-for="item in heatmap30"
+          :key="item.date"
+          class="heat-cell"
+          :class="heatClass(item.count)"
+        ></view>
+      </view>
+      <text class="metric-tip">0 / 1-5 / 6-15 / 16-30 / 30+</text>
     </view>
 
     <view class="filter-row" v-if="decks.length">
@@ -67,7 +80,7 @@
 </template>
 
 <script>
-import { getDecks, createDeck, renameDeck, getUserProfile, getDueReviewCards, getOfflineQueueMeta } from '@/utils/storage.js';
+import { getDecks, createDeck, renameDeck, getUserProfile, getDueReviewCards, getOfflineQueueMeta, getStudyHeatmap } from '@/utils/storage.js';
 import { toggleTheme } from '@/utils/theme.js';
 
 function countDue(cards = [], now = Date.now()) {
@@ -81,6 +94,7 @@ export default {
       allDecks: [],
       profile: { nickname: '', avatarText: '', goal: '' },
       dueCount: 0,
+      heatmap30: [],
       onlyDue: false,
       submitting: false,
       offlineMeta: { pending: 0, conflicts: 0 }
@@ -91,6 +105,7 @@ export default {
     this.profile = await getUserProfile();
     const dueCards = await getDueReviewCards();
     this.dueCount = dueCards.length;
+    this.heatmap30 = await getStudyHeatmap(30);
     this.offlineMeta = getOfflineQueueMeta();
   },
   methods: {
@@ -190,6 +205,13 @@ export default {
       const m = `${d.getMonth() + 1}`.padStart(2, '0');
       const day = `${d.getDate()}`.padStart(2, '0');
       return `${m}-${day}`;
+    },
+    heatClass(count) {
+      if (count >= 31) return 'lv-4';
+      if (count >= 16) return 'lv-3';
+      if (count >= 6) return 'lv-2';
+      if (count >= 1) return 'lv-1';
+      return 'lv-0';
     }
   }
 };
@@ -218,10 +240,18 @@ export default {
 .nickname { color: #fff; font-size: 28rpx; font-weight: 700; display: block; }
 .goal { color: rgba(255,255,255,0.92); font-size: 22rpx; margin-top: 4rpx; display: block; }
 .arrow { color: #fff; font-size: 34rpx; }
-.due-card { margin-top: 12rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: $fb-radius-card; padding: 18rpx 20rpx; box-shadow: $fb-shadow-card; }
-.due-title { color: $fb-text-secondary; font-size: 22rpx; display: block; }
-.due-value { color: $fb-text-accent; font-size: 40rpx; font-weight: 800; display: block; margin-top: 6rpx; }
-.due-tip,.offline-tip { color: $fb-text-secondary; font-size: 20rpx; display: block; margin-top: 4rpx; }
+.metric-card { margin-top: 12rpx; background: $fb-bg-surface; border: 1rpx solid #ebebeb; border-radius: $fb-radius-card; padding: 18rpx 20rpx; box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.08), 0px 2px 2px rgba(0,0,0,0.04); }
+.metric-title { color: #4d4d4d; font-size: 22rpx; display: block; }
+.metric-value { color: #171717; font-size: 54rpx; font-weight: 600; display: block; margin-top: 6rpx; letter-spacing: -0.8rpx; }
+.metric-tip,.offline-tip { color: #666666; font-size: 20rpx; display: block; margin-top: 4rpx; }
+.heat-card { padding-bottom: 16rpx; }
+.heatmap-row { margin-top: 10rpx; display: grid; grid-template-columns: repeat(15, 1fr); gap: 6rpx; }
+.heat-cell { width: 100%; aspect-ratio: 1; border-radius: 6rpx; }
+.lv-0 { background: $fb-heat-lv0; }
+.lv-1 { background: $fb-heat-lv1; }
+.lv-2 { background: $fb-heat-lv2; }
+.lv-3 { background: $fb-heat-lv3; }
+.lv-4 { background: $fb-heat-lv4; }
 .filter-row { margin-top: 10rpx; background: $fb-bg-surface; border: 1rpx solid $fb-border; border-radius: 18rpx; padding: 14rpx 18rpx; display: flex; align-items: center; justify-content: space-between; }
 .filter-label { color: $fb-text-primary; font-size: 24rpx; }
 .deck-grid { margin-top: 14rpx; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10rpx; }
